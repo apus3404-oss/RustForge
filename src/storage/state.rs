@@ -3,11 +3,12 @@ use redb::{Database, ReadableTable, TableDefinition};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
-// Minimal types for Phase 1 - will be enriched in Task 6
+// Storage-layer types (simplified for persistence)
+// These are separate from engine::types domain models
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct WorkflowExecution {
+pub struct StoredExecution {
     pub id: String,
-    pub status: ExecutionStatus,
+    pub status: StoredExecutionStatus,
     pub created_at: u64,
     pub updated_at: u64,
     pub data: Vec<u8>,
@@ -22,7 +23,7 @@ pub struct Checkpoint {
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-pub enum ExecutionStatus {
+pub enum StoredExecutionStatus {
     Running,
     Completed,
     Failed,
@@ -51,7 +52,7 @@ impl StateStore {
         Ok(Self { db })
     }
 
-    pub fn save_execution(&self, execution: &WorkflowExecution) -> Result<()> {
+    pub fn save_execution(&self, execution: &StoredExecution) -> Result<()> {
         let serialized = bincode::serialize(execution)?;
 
         let write_txn = self.db.begin_write()?;
@@ -64,14 +65,14 @@ impl StateStore {
         Ok(())
     }
 
-    pub fn get_execution(&self, id: &str) -> Result<Option<WorkflowExecution>> {
+    pub fn get_execution(&self, id: &str) -> Result<Option<StoredExecution>> {
         let read_txn = self.db.begin_read()?;
         let table = read_txn.open_table(EXECUTIONS_TABLE)?;
 
         match table.get(id)? {
             Some(value) => {
                 let bytes = value.value();
-                let execution: WorkflowExecution = bincode::deserialize(bytes)?;
+                let execution: StoredExecution = bincode::deserialize(bytes)?;
                 Ok(Some(execution))
             }
             None => Ok(None),
@@ -145,9 +146,9 @@ mod tests {
         let db_path = temp_dir.path().join("state.db");
         let store = StateStore::new(&db_path).unwrap();
 
-        let execution = WorkflowExecution {
+        let execution = StoredExecution {
             id: "exec-123".to_string(),
-            status: ExecutionStatus::Running,
+            status: StoredExecutionStatus::Running,
             created_at: 1000,
             updated_at: 1000,
             data: vec![1, 2, 3, 4],
@@ -189,7 +190,7 @@ mod tests {
         store.save_execution(&execution).unwrap();
 
         // Update execution
-        execution.status = ExecutionStatus::Completed;
+        execution.status = StoredExecutionStatus::Completed;
         execution.updated_at = 2000;
         store.save_execution(&execution).unwrap();
 

@@ -1,3 +1,3 @@
 pub mod state;
 
-pub use state::{StateStore, WorkflowExecution, Checkpoint, ExecutionStatus};
+pub use state::{Checkpoint, StateStore, StoredExecution, StoredExecutionStatus};
