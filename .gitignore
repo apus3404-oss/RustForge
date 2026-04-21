@@ -14,3 +14,4 @@
 !.rustforge/config.toml.example
 reports/
 *.log
+.claude/
