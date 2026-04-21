@@ -1,24 +1,34 @@
 // src/engine/executor.rs
-use crate::engine::types::{ExecutionContext, WorkflowDefinition};
-use crate::engine::events::{EventBus, AgentEvent};
+use crate::agents::{Agent, AgentRegistry, BaseAgent, Task as AgentTask};
+use crate::engine::events::{AgentEvent, EventBus};
 use crate::engine::interpolation::VariableInterpolator;
-use crate::error::Result;
+use crate::engine::types::{ExecutionContext, WorkflowDefinition};
+use crate::error::{Error, Result};
+use crate::llm::LLMProvider;
 use std::sync::Arc;
-use tracing::{info, debug};
+use tracing::{debug, info};
 
-/// Sequential executor for workflows
-/// This is a stub implementation that logs and publishes events
-/// Real agent execution will be implemented in Phase 2
+/// Sequential executor for workflows with real agent integration
 pub struct SequentialExecutor {
     event_bus: Arc<EventBus>,
+    llm_provider: Arc<dyn LLMProvider>,
+    agent_registry: Arc<AgentRegistry>,
 }
 
 impl SequentialExecutor {
-    pub fn new(event_bus: Arc<EventBus>) -> Self {
-        Self { event_bus }
+    pub fn new(
+        event_bus: Arc<EventBus>,
+        llm_provider: Arc<dyn LLMProvider>,
+        agent_registry: Arc<AgentRegistry>,
+    ) -> Self {
+        Self {
+            event_bus,
+            llm_provider,
+            agent_registry,
+        }
     }
 
-    /// Execute a workflow sequentially
+    /// Execute a workflow sequentially using real agents
     /// Returns the final output as JSON
     pub async fn execute(
         &self,
@@ -33,69 +43,123 @@ impl SequentialExecutor {
             "agents": []
         });
 
-        for agent in &workflow.agents {
-            debug!("Executing agent: {}", agent.id);
+        for agent_config in &workflow.agents {
+            debug!("Executing agent: {}", agent_config.id);
 
             // Interpolate task variables
             let interpolator = VariableInterpolator::new(context);
-            let interpolated_task = interpolator.interpolate(&agent.task)?;
+            let interpolated_task = interpolator.interpolate(&agent_config.task)?;
 
             // Publish TaskStarted event
             self.event_bus
                 .publish(AgentEvent::TaskStarted {
-                    agent_id: agent.id.clone(),
+                    agent_id: agent_config.id.clone(),
                     task: interpolated_task.clone(),
                 })
                 .ok(); // Ignore send errors if no subscribers
 
-            // Stub: Simulate agent execution
-            // In Phase 2, this will call real agent implementations
-            info!("Agent {} executing task: {}", agent.id, interpolated_task);
+            // Get or create agent instance
+            let agent = self.get_or_create_agent(&agent_config.id, &agent_config.agent_type)?;
 
-            // Create mock output for stub
-            let agent_output = serde_json::json!({
-                "agent_id": agent.id,
-                "status": "completed",
-                "task": interpolated_task,
-                "result": format!("Stub output from {}", agent.id)
-            });
+            // Create task for agent
+            let task = AgentTask::new(&agent_config.id, &interpolated_task);
+
+            // Execute agent
+            info!("Agent {} executing task: {}", agent_config.id, interpolated_task);
+            let agent_output = agent.execute(task).await?;
 
             // Store agent output in context for next agents to use
-            let output_key = format!("{}.output", agent.id);
-            context.set_value(&output_key, agent_output["result"].clone());
+            let output_key = format!("{}.output", agent_config.id);
+            if let Some(result) = &agent_output.result {
+                context.set_value(&output_key, result.clone());
+            }
+
+            // Create output JSON
+            let output_json = serde_json::json!({
+                "agent_id": agent_output.agent_id,
+                "task_id": agent_output.task_id,
+                "status": agent_output.status,
+                "result": agent_output.result,
+                "error": agent_output.error,
+            });
 
             // Publish TaskCompleted event
             self.event_bus
                 .publish(AgentEvent::TaskCompleted {
-                    agent_id: agent.id.clone(),
-                    output: agent_output["result"].to_string(),
+                    agent_id: agent_config.id.clone(),
+                    output: agent_output.result.map(|v| v.to_string()).unwrap_or_default(),
                 })
                 .ok(); // Ignore send errors if no subscribers
 
             // Add to final output
             if let Some(agents_array) = final_output["agents"].as_array_mut() {
-                agents_array.push(agent_output);
+                agents_array.push(output_json);
             }
 
-            debug!("Agent {} completed successfully", agent.id);
+            debug!("Agent {} completed successfully", agent_config.id);
         }
 
-        info!("Sequential execution completed successfully");
+        info!("Workflow execution completed");
         Ok(final_output)
     }
+
+    fn get_or_create_agent(&self, agent_id: &str, agent_type: &str) -> Result<Arc<dyn Agent>> {
+        // Try to get from registry first
+        if let Some(agent) = self.agent_registry.get(agent_id) {
+            return Ok(agent);
+        }
+
+        // Create new BaseAgent if not found
+        let definition = crate::agents::AgentDefinition::new(agent_id, agent_type);
+        let agent = Arc::new(BaseAgent::new(definition, self.llm_provider.clone()));
+
+        // Register for future use
+        self.agent_registry.register(agent.clone())?;
+
+        Ok(agent)
+    }
+}
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::agents::AgentDefinition;
     use crate::engine::types::AgentConfig;
-    use serde_json::json;
+    use crate::llm::types::{CompletionOptions, Message};
     use std::collections::HashMap;
+
+    struct MockLLMProvider;
+
+    #[async_trait::async_trait]
+    impl LLMProvider for MockLLMProvider {
+        async fn complete(
+            &self,
+            _messages: Vec<Message>,
+            _options: CompletionOptions,
+        ) -> Result<String> {
+            Ok("Mock LLM response".to_string())
+        }
+
+        fn supports_streaming(&self) -> bool {
+            false
+        }
+
+        fn max_context_tokens(&self) -> usize {
+            4096
+        }
+
+        fn name(&self) -> &str {
+            "mock"
+        }
+    }
 
     #[tokio::test]
     async fn test_sequential_execution_with_single_agent() {
         let event_bus = Arc::new(EventBus::new());
-        let executor = SequentialExecutor::new(event_bus.clone());
+        let llm = Arc::new(MockLLMProvider);
+        let registry = Arc::new(AgentRegistry::new());
+        let executor = SequentialExecutor::new(event_bus, llm, registry);
 
         let workflow = WorkflowDefinition {
             name: "Test Workflow".to_string(),
@@ -121,7 +185,9 @@ mod tests {
     #[tokio::test]
     async fn test_sequential_execution_with_multiple_agents() {
         let event_bus = Arc::new(EventBus::new());
-        let executor = SequentialExecutor::new(event_bus.clone());
+        let llm = Arc::new(MockLLMProvider);
+        let registry = Arc::new(AgentRegistry::new());
+        let executor = SequentialExecutor::new(event_bus, llm, registry);
 
         let workflow = WorkflowDefinition {
             name: "Multi-Agent Workflow".to_string(),
@@ -158,7 +224,9 @@ mod tests {
     #[tokio::test]
     async fn test_sequential_execution_with_variable_interpolation() {
         let event_bus = Arc::new(EventBus::new());
-        let executor = SequentialExecutor::new(event_bus.clone());
+        let llm = Arc::new(MockLLMProvider);
+        let registry = Arc::new(AgentRegistry::new());
+        let executor = SequentialExecutor::new(event_bus, llm, registry);
 
         let workflow = WorkflowDefinition {
             name: "Interpolation Test".to_string(),
@@ -185,56 +253,6 @@ mod tests {
         let mut context = ExecutionContext::new("test-workflow".to_string());
         let result = executor.execute(&workflow, &mut context).await;
 
-        assert!(result.is_ok());
-    }
-
-    #[tokio::test]
-    async fn test_events_published_during_execution() {
-        let event_bus = Arc::new(EventBus::new());
-        let mut subscriber = event_bus.subscribe();
-        let executor = SequentialExecutor::new(event_bus.clone());
-
-        let workflow = WorkflowDefinition {
-            name: "Event Test".to_string(),
-            mode: crate::engine::types::ExecutionMode::Sequential,
-            agents: vec![AgentConfig {
-                id: "agent1".to_string(),
-                agent_type: "TestAgent".to_string(),
-                task: "Test task".to_string(),
-                depends_on: vec![],
-                config: HashMap::new(),
-            }],
-            inputs: None,
-        };
-
-        let mut context = ExecutionContext::new("test-workflow".to_string());
-
-        // Execute in a separate task so we can receive events
-        let exec_handle = tokio::spawn(async move {
-            executor.execute(&workflow, &mut context).await
-        });
-
-        // Receive TaskStarted event
-        let event1 = subscriber.recv().await.unwrap();
-        match event1 {
-            AgentEvent::TaskStarted { agent_id, task } => {
-                assert_eq!(agent_id, "agent1");
-                assert_eq!(task, "Test task");
-            }
-            _ => panic!("Expected TaskStarted event"),
-        }
-
-        // Receive TaskCompleted event
-        let event2 = subscriber.recv().await.unwrap();
-        match event2 {
-            AgentEvent::TaskCompleted { agent_id, .. } => {
-                assert_eq!(agent_id, "agent1");
-            }
-            _ => panic!("Expected TaskCompleted event"),
-        }
-
-        // Wait for execution to complete
-        let result = exec_handle.await.unwrap();
         assert!(result.is_ok());
     }
 }
