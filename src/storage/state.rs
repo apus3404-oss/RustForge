@@ -179,9 +179,9 @@ mod tests {
         let db_path = temp_dir.path().join("state.db");
         let store = StateStore::new(&db_path).unwrap();
 
-        let mut execution = WorkflowExecution {
+        let mut execution = StoredExecution {
             id: "exec-456".to_string(),
-            status: ExecutionStatus::Running,
+            status: StoredExecutionStatus::Running,
             created_at: 1000,
             updated_at: 1000,
             data: vec![1, 2, 3],
@@ -196,7 +196,7 @@ mod tests {
 
         // Verify update
         let retrieved = store.get_execution("exec-456").unwrap().unwrap();
-        assert_eq!(retrieved.status, ExecutionStatus::Completed);
+        assert_eq!(retrieved.status, StoredExecutionStatus::Completed);
         assert_eq!(retrieved.updated_at, 2000);
     }
 

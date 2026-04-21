@@ -31,7 +31,7 @@ pub enum Error {
 
     // Storage errors
     #[error("Storage error: {0}")]
-    Storage(#[from] redb::Error),
+    Storage(String),
 
     #[error("Serialization error: {0}")]
     Serialization(String),
@@ -64,6 +64,37 @@ impl From<serde_json::Error> for Error {
 impl From<bincode::Error> for Error {
     fn from(err: bincode::Error) -> Self {
         Error::Serialization(err.to_string())
+    }
+}
+
+// redb error conversions
+impl From<redb::DatabaseError> for Error {
+    fn from(err: redb::DatabaseError) -> Self {
+        Error::Storage(err.to_string())
+    }
+}
+
+impl From<redb::TransactionError> for Error {
+    fn from(err: redb::TransactionError) -> Self {
+        Error::Storage(err.to_string())
+    }
+}
+
+impl From<redb::TableError> for Error {
+    fn from(err: redb::TableError) -> Self {
+        Error::Storage(err.to_string())
+    }
+}
+
+impl From<redb::CommitError> for Error {
+    fn from(err: redb::CommitError) -> Self {
+        Error::Storage(err.to_string())
+    }
+}
+
+impl From<redb::StorageError> for Error {
+    fn from(err: redb::StorageError) -> Self {
+        Error::Storage(err.to_string())
     }
 }
 

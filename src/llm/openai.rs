@@ -190,6 +190,6 @@ mod tests {
         let provider = OpenAIProvider::new("test-key", "gpt-4");
         assert_eq!(provider.name(), "openai");
         assert_eq!(provider.max_context_tokens(), 128000);
-        assert!(provider.supports_streaming());
+        assert!(!provider.supports_streaming()); // Streaming not implemented in Phase 2
     }
 }

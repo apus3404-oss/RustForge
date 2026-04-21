@@ -160,6 +160,6 @@ mod tests {
         let provider = OllamaProvider::new("http://localhost:11434", "llama2");
         assert_eq!(provider.name(), "ollama");
         assert_eq!(provider.max_context_tokens(), 4096);
-        assert!(provider.supports_streaming());
+        assert!(!provider.supports_streaming()); // Streaming not implemented in Phase 2
     }
 }

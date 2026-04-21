@@ -22,10 +22,9 @@ impl AgentRegistry {
         let mut agents = self.agents.write().unwrap();
 
         if agents.contains_key(&id) {
-            return Err(Error::InvalidWorkflowDefinition(format!(
-                "Agent with id '{}' is already registered",
-                id
-            )));
+            return Err(Error::InvalidWorkflowDefinition {
+                reason: format!("Agent with id '{}' is already registered", id),
+            });
         }
 
         agents.insert(id, agent);

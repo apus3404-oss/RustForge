@@ -1,8 +1,10 @@
 // src/cli/handlers.rs
+use crate::agents::AgentRegistry;
 use crate::cli::commands::{Commands, ConfigCommands};
 use crate::config::{ConfigLoader, GlobalConfig};
 use crate::engine::{EventBus, ExecutionContext, SequentialExecutor, WorkflowParser};
 use crate::error::Result;
+use crate::llm::{LLMRegistry, OllamaProvider, OpenAIProvider};
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -89,7 +91,23 @@ async fn handle_run(
 
     // Create event bus and executor
     let event_bus = Arc::new(EventBus::new());
-    let executor = SequentialExecutor::new(event_bus.clone());
+
+    // Create LLM registry with Ollama and OpenAI providers
+    let ollama = Arc::new(OllamaProvider::new(
+        "http://localhost:11434".to_string(),
+        "llama3".to_string(),
+    ));
+    let openai = Arc::new(OpenAIProvider::new(
+        env::var("OPENAI_API_KEY").unwrap_or_default(),
+        "gpt-4o-mini".to_string(),
+    ));
+
+    let llm_registry = Arc::new(LLMRegistry::with_fallback(ollama.clone(), openai.clone()));
+
+    // Create agent registry
+    let agent_registry = Arc::new(AgentRegistry::new());
+
+    let executor = SequentialExecutor::new(event_bus.clone(), llm_registry, agent_registry);
 
     // Execute workflow
     println!("✓ Starting execution...");

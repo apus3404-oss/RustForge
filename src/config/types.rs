@@ -26,10 +26,15 @@ mod duration_secs {
 /// Main configuration container
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct GlobalConfig {
+    #[serde(default)]
     pub llm: LLMConfig,
+    #[serde(default)]
     pub execution: ExecutionConfig,
+    #[serde(default)]
     pub permissions: PermissionConfig,
+    #[serde(default)]
     pub ui: UIConfig,
+    #[serde(default)]
     pub logging: LoggingConfig,
 }
 
@@ -92,6 +97,8 @@ impl GlobalConfig {
 /// LLM provider configuration
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct LLMConfig {
+    #[serde(default = "default_provider")]
+    pub default_provider: String,
     #[serde(default)]
     pub providers: Vec<ProviderConfig>,
     #[serde(default = "default_model")]
@@ -105,6 +112,7 @@ pub struct LLMConfig {
 impl Default for LLMConfig {
     fn default() -> Self {
         Self {
+            default_provider: default_provider(),
             providers: vec![
                 ProviderConfig {
                     name: "openai".to_string(),
@@ -118,6 +126,10 @@ impl Default for LLMConfig {
             default_max_tokens: default_max_tokens(),
         }
     }
+}
+
+fn default_provider() -> String {
+    "ollama:llama3".to_string()
 }
 
 fn default_model() -> String {

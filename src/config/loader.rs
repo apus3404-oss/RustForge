@@ -1,5 +1,5 @@
 use crate::config::types::GlobalConfig;
-use crate::error::{RustForgeError, Result};
+use crate::error::{Error, Result};
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -35,11 +35,11 @@ impl ConfigLoader {
     /// Load configuration from a specific file
     pub fn load_from_file(path: &Path) -> Result<GlobalConfig> {
         let content = fs::read_to_string(path).map_err(|e| {
-            RustForgeError::ConfigError(format!("Failed to read config file {:?}: {}", path, e))
+            Error::Config(format!("Failed to read config file {:?}: {}", path, e))
         })?;
 
         let config: GlobalConfig = toml::from_str(&content).map_err(|e| {
-            RustForgeError::ConfigError(format!("Failed to parse config file {:?}: {}", path, e))
+            Error::Config(format!("Failed to parse config file {:?}: {}", path, e))
         })?;
 
         Ok(config)
@@ -50,7 +50,7 @@ impl ConfigLoader {
         // Create parent directory if it doesn't exist
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent).map_err(|e| {
-                RustForgeError::ConfigError(format!(
+                Error::Config(format!(
                     "Failed to create config directory {:?}: {}",
                     parent, e
                 ))
@@ -58,11 +58,11 @@ impl ConfigLoader {
         }
 
         let content = toml::to_string_pretty(config).map_err(|e| {
-            RustForgeError::ConfigError(format!("Failed to serialize config: {}", e))
+            Error::Config(format!("Failed to serialize config: {}", e))
         })?;
 
         fs::write(path, content).map_err(|e| {
-            RustForgeError::ConfigError(format!("Failed to write config file {:?}: {}", path, e))
+            Error::Config(format!("Failed to write config file {:?}: {}", path, e))
         })?;
 
         Ok(())
