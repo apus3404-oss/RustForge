@@ -5,6 +5,7 @@ pub mod interpolation;
 pub mod events;
 pub mod executor;
 pub mod parallel;
+pub mod merge;
 
 pub use types::*;
 pub use parser::WorkflowParser;
@@ -12,3 +13,4 @@ pub use interpolation::VariableInterpolator;
 pub use events::{EventBus, AgentEvent};
 pub use executor::SequentialExecutor;
 pub use parallel::ParallelExecutor;
+pub use merge::{MergeStrategy, merge_results};
