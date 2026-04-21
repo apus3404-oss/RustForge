@@ -1,1 +1,16 @@
-.worktrees/
+/target
+/Cargo.lock
+**/*.rs.bk
+*.pdb
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# RustForge specific
+.rustforge/
+!.rustforge/config.toml.example
+reports/
+*.log
