@@ -28,6 +28,10 @@ pub trait Agent: Send + Sync {
 }
 
 /// Base agent that uses an LLM provider
+///
+/// **Note:** This is a stub implementation for Phase 2.
+/// Real LLM-based execution will be implemented in Phase 3.
+/// Currently returns mock responses for testing integration.
 pub struct BaseAgent {
     definition: AgentDefinition,
     llm_provider: Arc<dyn LLMProvider>,

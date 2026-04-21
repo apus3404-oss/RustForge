@@ -82,7 +82,7 @@ impl LLMProvider for OllamaProvider {
     }
 
     fn supports_streaming(&self) -> bool {
-        true
+        false // Streaming not implemented in Phase 2
     }
 
     fn max_context_tokens(&self) -> usize {

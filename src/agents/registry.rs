@@ -1,84 +1,96 @@
 use crate::agents::traits::Agent;
 use crate::error::{Error, Result};
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 
-/// Registry for managing agent instances
+/// Registry for managing agent instances (thread-safe)
 pub struct AgentRegistry {
-    agents: HashMap<String, Arc<dyn Agent>>,
+    agents: RwLock<HashMap<String, Arc<dyn Agent>>>,
 }
 
 impl AgentRegistry {
     /// Create a new empty registry
     pub fn new() -> Self {
         Self {
-            agents: HashMap::new(),
+            agents: RwLock::new(HashMap::new()),
         }
     }
 
     /// Register an agent with the registry
-    pub fn register(&mut self, agent: Arc<dyn Agent>) -> Result<()> {
+    pub fn register(&self, agent: Arc<dyn Agent>) -> Result<()> {
         let id = agent.id().to_string();
+        let mut agents = self.agents.write().unwrap();
 
-        if self.agents.contains_key(&id) {
+        if agents.contains_key(&id) {
             return Err(Error::InvalidWorkflowDefinition(format!(
                 "Agent with id '{}' is already registered",
                 id
             )));
         }
 
-        self.agents.insert(id, agent);
+        agents.insert(id, agent);
         Ok(())
     }
 
     /// Get an agent by ID
-    pub fn get(&self, id: &str) -> Option<&Arc<dyn Agent>> {
-        self.agents.get(id)
+    pub fn get(&self, id: &str) -> Option<Arc<dyn Agent>> {
+        let agents = self.agents.read().unwrap();
+        agents.get(id).cloned()
     }
 
     /// Check if an agent is registered
     pub fn contains(&self, id: &str) -> bool {
-        self.agents.contains_key(id)
+        let agents = self.agents.read().unwrap();
+        agents.contains_key(id)
     }
 
     /// Get all registered agent IDs
     pub fn agent_ids(&self) -> Vec<String> {
-        self.agents.keys().cloned().collect()
+        let agents = self.agents.read().unwrap();
+        agents.keys().cloned().collect()
     }
 
     /// Get the number of registered agents
     pub fn len(&self) -> usize {
-        self.agents.len()
+        let agents = self.agents.read().unwrap();
+        agents.len()
     }
 
     /// Check if the registry is empty
     pub fn is_empty(&self) -> bool {
-        self.agents.is_empty()
+        let agents = self.agents.read().unwrap();
+        agents.is_empty()
     }
 
     /// Remove an agent from the registry
-    pub fn unregister(&mut self, id: &str) -> Option<Arc<dyn Agent>> {
-        self.agents.remove(id)
+    pub fn unregister(&self, id: &str) -> Option<Arc<dyn Agent>> {
+        let mut agents = self.agents.write().unwrap();
+        agents.remove(id)
     }
 
     /// Clear all agents from the registry
-    pub fn clear(&mut self) {
-        self.agents.clear();
+    pub fn clear(&self) {
+        let mut agents = self.agents.write().unwrap();
+        agents.clear();
     }
 
     /// Find agents by type
-    pub fn find_by_type(&self, agent_type: &str) -> Vec<&Arc<dyn Agent>> {
-        self.agents
+    pub fn find_by_type(&self, agent_type: &str) -> Vec<Arc<dyn Agent>> {
+        let agents = self.agents.read().unwrap();
+        agents
             .values()
             .filter(|agent| agent.agent_type() == agent_type)
+            .cloned()
             .collect()
     }
 
     /// Find agents that can handle a specific task type
-    pub fn find_capable(&self, task_type: &str) -> Vec<&Arc<dyn Agent>> {
-        self.agents
+    pub fn find_capable(&self, task_type: &str) -> Vec<Arc<dyn Agent>> {
+        let agents = self.agents.read().unwrap();
+        agents
             .values()
             .filter(|agent| agent.can_handle(task_type))
+            .cloned()
             .collect()
     }
 }
@@ -131,7 +143,7 @@ mod tests {
 
     #[test]
     fn test_register_agent() {
-        let mut registry = AgentRegistry::new();
+        let registry = AgentRegistry::new();
         let agent = create_test_agent("agent1", "research");
 
         assert!(registry.register(agent).is_ok());
@@ -141,7 +153,7 @@ mod tests {
 
     #[test]
     fn test_register_duplicate_agent() {
-        let mut registry = AgentRegistry::new();
+        let registry = AgentRegistry::new();
         let agent1 = create_test_agent("agent1", "research");
         let agent2 = create_test_agent("agent1", "analysis");
 
@@ -154,7 +166,7 @@ mod tests {
 
     #[test]
     fn test_get_agent() {
-        let mut registry = AgentRegistry::new();
+        let registry = AgentRegistry::new();
         let agent = create_test_agent("agent1", "research");
         registry.register(agent).unwrap();
 
@@ -171,7 +183,7 @@ mod tests {
 
     #[test]
     fn test_unregister_agent() {
-        let mut registry = AgentRegistry::new();
+        let registry = AgentRegistry::new();
         let agent = create_test_agent("agent1", "research");
         registry.register(agent).unwrap();
 
@@ -183,7 +195,7 @@ mod tests {
 
     #[test]
     fn test_agent_ids() {
-        let mut registry = AgentRegistry::new();
+        let registry = AgentRegistry::new();
         registry.register(create_test_agent("agent1", "research")).unwrap();
         registry.register(create_test_agent("agent2", "analysis")).unwrap();
 
@@ -195,7 +207,7 @@ mod tests {
 
     #[test]
     fn test_find_by_type() {
-        let mut registry = AgentRegistry::new();
+        let registry = AgentRegistry::new();
         registry.register(create_test_agent("agent1", "research")).unwrap();
         registry.register(create_test_agent("agent2", "research")).unwrap();
         registry.register(create_test_agent("agent3", "analysis")).unwrap();
@@ -209,7 +221,7 @@ mod tests {
 
     #[test]
     fn test_find_capable() {
-        let mut registry = AgentRegistry::new();
+        let registry = AgentRegistry::new();
         registry.register(create_test_agent("agent1", "research")).unwrap();
         registry.register(create_test_agent("agent2", "analysis")).unwrap();
 
@@ -220,7 +232,7 @@ mod tests {
 
     #[test]
     fn test_clear_registry() {
-        let mut registry = AgentRegistry::new();
+        let registry = AgentRegistry::new();
         registry.register(create_test_agent("agent1", "research")).unwrap();
         registry.register(create_test_agent("agent2", "analysis")).unwrap();
 
