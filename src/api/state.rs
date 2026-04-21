@@ -3,7 +3,7 @@ use crate::config::GlobalConfig;
 use crate::engine::EventBus;
 use crate::llm::LLMRegistry;
 use crate::security::{AuditLogger, PermissionManager};
-use crate::storage::StateStore;
+use crate::storage::{StateStore, WorkflowStore};
 use crate::tools::ToolRegistry;
 use std::sync::Arc;
 
@@ -22,6 +22,8 @@ pub struct AppState {
     pub permission_manager: Arc<PermissionManager>,
     /// State store for executions
     pub state_store: Arc<StateStore>,
+    /// Workflow store for workflow definitions
+    pub workflow_store: Arc<WorkflowStore>,
     /// Event bus for real-time updates
     pub event_bus: Arc<EventBus>,
     /// Audit logger
@@ -37,6 +39,7 @@ impl AppState {
         tool_registry: Arc<ToolRegistry>,
         permission_manager: Arc<PermissionManager>,
         state_store: Arc<StateStore>,
+        workflow_store: Arc<WorkflowStore>,
         event_bus: Arc<EventBus>,
         audit_logger: Arc<AuditLogger>,
     ) -> Self {
@@ -47,6 +50,7 @@ impl AppState {
             tool_registry,
             permission_manager,
             state_store,
+            workflow_store,
             event_bus,
             audit_logger,
         }
@@ -102,6 +106,9 @@ mod tests {
         let state_store = Arc::new(
             StateStore::new(&db_path).unwrap()
         );
+        let workflow_store = Arc::new(
+            WorkflowStore::new(&temp_dir).unwrap()
+        );
 
         let event_bus = Arc::new(EventBus::new());
         let audit_logger = Arc::new(AuditLogger::new());
@@ -113,6 +120,7 @@ mod tests {
             tool_registry,
             permission_manager,
             state_store,
+            workflow_store,
             event_bus,
             audit_logger,
         );
@@ -138,6 +146,9 @@ mod tests {
         let state_store = Arc::new(
             StateStore::new(&db_path).unwrap()
         );
+        let workflow_store = Arc::new(
+            WorkflowStore::new(&temp_dir).unwrap()
+        );
 
         let event_bus = Arc::new(EventBus::new());
         let audit_logger = Arc::new(AuditLogger::new());
@@ -149,6 +160,7 @@ mod tests {
             tool_registry,
             permission_manager,
             state_store,
+            workflow_store,
             event_bus,
             audit_logger,
         );

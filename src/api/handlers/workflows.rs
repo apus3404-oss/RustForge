@@ -48,7 +48,7 @@ fn validate_workflow(definition: &WorkflowDefinition) -> Result<(), String> {
 
 /// Create a new workflow
 pub async fn create_workflow(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
     Json(definition): Json<WorkflowDefinition>,
 ) -> Result<Json<WorkflowResponse>, ApiError> {
     // Validate workflow
@@ -58,8 +58,11 @@ pub async fn create_workflow(
     // Generate workflow ID
     let workflow_id = Uuid::new_v4().to_string();
 
-    // TODO: Save workflow definition to file system
-    // For now, just return success response
+    // Save workflow definition to file system
+    state
+        .workflow_store
+        .save(&workflow_id, &definition)
+        .map_err(|e| ApiError::internal_error(format!("Failed to save workflow: {}", e)))?;
 
     Ok(Json(WorkflowResponse {
         id: workflow_id,
@@ -70,31 +73,57 @@ pub async fn create_workflow(
 
 /// List all workflows
 pub async fn list_workflows(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
 ) -> Result<Json<Vec<WorkflowSummary>>, ApiError> {
-    // TODO: List workflows from file system
-    // For now, return empty list
-    Ok(Json(vec![]))
+    // List workflow IDs from file system
+    let workflow_ids = state
+        .workflow_store
+        .list()
+        .map_err(|e| ApiError::internal_error(format!("Failed to list workflows: {}", e)))?;
+
+    let mut summaries = Vec::new();
+
+    // Load each workflow to create summary
+    for id in workflow_ids {
+        if let Ok(definition) = state.workflow_store.load(&id) {
+            summaries.push(WorkflowSummary {
+                id: id.clone(),
+                name: definition.name,
+                mode: format!("{:?}", definition.mode).to_lowercase(),
+                agent_count: definition.agents.len(),
+                created_at: Utc::now(), // TODO: Store actual creation time
+            });
+        }
+    }
+
+    Ok(Json(summaries))
 }
 
 /// Get a specific workflow by ID
 pub async fn get_workflow(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<Json<WorkflowDefinition>, ApiError> {
-    // TODO: Load workflow from file system
-    // For now, return not found
-    Err(ApiError::not_found("Workflow", &id))
+    // Load workflow from file system
+    let definition = state
+        .workflow_store
+        .load(&id)
+        .map_err(|_| ApiError::not_found("Workflow", &id))?;
+
+    Ok(Json(definition))
 }
 
 /// Delete a workflow by ID
 pub async fn delete_workflow(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<StatusCode, ApiError> {
-    // TODO: Delete workflow file
-    // For now, just return success
-    let _ = id; // Suppress unused warning
+    // Delete workflow file
+    state
+        .workflow_store
+        .delete(&id)
+        .map_err(|_| ApiError::not_found("Workflow", &id))?;
+
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -144,8 +173,16 @@ mod tests {
         let tool_registry = Arc::new(ToolRegistry::new());
         let permission_manager = Arc::new(PermissionManager::allow_all());
         let temp_dir = std::env::temp_dir();
-        let db_path = temp_dir.join(format!("test_workflow_{}.db", Uuid::new_v4()));
+        let unique_dir = temp_dir.join(format!("rustforge_test_{}", Uuid::new_v4()));
+        let db_path = unique_dir.join("test.db");
+
+        // Create unique directory
+        std::fs::create_dir_all(&unique_dir).unwrap();
+
         let state_store = Arc::new(StateStore::new(&db_path).unwrap());
+        let workflow_store = Arc::new(
+            crate::storage::WorkflowStore::new(&unique_dir).unwrap()
+        );
         let event_bus = Arc::new(EventBus::new());
         let audit_logger = Arc::new(AuditLogger::new());
 
@@ -156,6 +193,7 @@ mod tests {
             tool_registry,
             permission_manager,
             state_store,
+            workflow_store,
             event_bus,
             audit_logger,
         )
@@ -220,9 +258,27 @@ mod tests {
     #[tokio::test]
     async fn test_list_workflows() {
         let state = create_test_state();
+
+        // Create a workflow first
+        let workflow = WorkflowDefinition {
+            name: "Test Workflow".to_string(),
+            mode: crate::engine::types::ExecutionMode::Sequential,
+            agents: vec![AgentConfig {
+                id: "agent1".to_string(),
+                agent_type: "base".to_string(),
+                task: "Test task".to_string(),
+                depends_on: vec![],
+                config: std::collections::HashMap::new(),
+            }],
+            inputs: None,
+        };
+
+        create_workflow(State(state.clone()), Json(workflow)).await.unwrap();
+
+        // Now list workflows
         let result = list_workflows(State(state)).await;
         assert!(result.is_ok());
-        assert_eq!(result.unwrap().0.len(), 0);
+        assert_eq!(result.unwrap().0.len(), 1);
     }
 
     #[tokio::test]
@@ -235,7 +291,27 @@ mod tests {
     #[tokio::test]
     async fn test_delete_workflow() {
         let state = create_test_state();
-        let result = delete_workflow(State(state), Path("test-id".to_string())).await;
+
+        // First create a workflow
+        let workflow = WorkflowDefinition {
+            name: "Test Workflow".to_string(),
+            mode: crate::engine::types::ExecutionMode::Sequential,
+            agents: vec![AgentConfig {
+                id: "agent1".to_string(),
+                agent_type: "base".to_string(),
+                task: "Test task".to_string(),
+                depends_on: vec![],
+                config: std::collections::HashMap::new(),
+            }],
+            inputs: None,
+        };
+
+        let create_result = create_workflow(State(state.clone()), Json(workflow)).await;
+        assert!(create_result.is_ok());
+        let workflow_id = create_result.unwrap().0.id;
+
+        // Now delete it
+        let result = delete_workflow(State(state), Path(workflow_id)).await;
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), StatusCode::NO_CONTENT);
     }

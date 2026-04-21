@@ -177,6 +177,9 @@ mod tests {
         let temp_dir = std::env::temp_dir();
         let db_path = temp_dir.join(format!("test_exec_{}.db", Uuid::new_v4()));
         let state_store = Arc::new(StateStore::new(&db_path).unwrap());
+        let workflow_store = Arc::new(
+            crate::storage::WorkflowStore::new(&temp_dir).unwrap()
+        );
         let event_bus = Arc::new(EventBus::new());
         let audit_logger = Arc::new(AuditLogger::new());
 
@@ -187,6 +190,7 @@ mod tests {
             tool_registry,
             permission_manager,
             state_store,
+            workflow_store,
             event_bus,
             audit_logger,
         )
