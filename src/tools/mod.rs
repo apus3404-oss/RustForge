@@ -1,3 +1,4 @@
+pub mod api_client;
 pub mod filesystem;
 pub mod pdf_parser;
 pub mod shell;
@@ -5,6 +6,7 @@ pub mod traits;
 pub mod types;
 pub mod web_scraper;
 
+pub use api_client::ApiClientTool;
 pub use filesystem::FileSystemTool;
 pub use pdf_parser::PdfParserTool;
 pub use shell::ShellExecutorTool;
