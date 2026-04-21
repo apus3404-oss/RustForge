@@ -6,9 +6,9 @@
 
 RustForge is a high-performance orchestration engine for AI agent workflows. Define multi-agent workflows in YAML, execute them locally with full control over your data, and leverage powerful features like variable interpolation, checkpointing, and real-time event streaming.
 
-**Current Status:** Phase 3 - Tool Layer & Security ✅
+**Current Status:** Phase 4 - API & Execution Patterns ✅
 
-Phase 3 adds complete tool system with 6 built-in tools, permission management, process isolation, and audit logging. Agents can now execute tools with security controls.
+Phase 4 adds REST API with WebSocket support, parallel execution, merge strategies, timeout/cancellation, and comprehensive integration tests.
 
 ## Features
 
@@ -29,13 +29,22 @@ Phase 3 adds complete tool system with 6 built-in tools, permission management, 
 - **Real Agent Execution** - Workflows now execute with actual LLM calls
 - **Thread-Safe Registries** - Concurrent agent and LLM provider management
 
-### Tool Layer & Security (Phase 3) 🆕
+### Tool Layer & Security (Phase 3)
 - **6 Built-in Tools** - FileSystem, WebScraper, PDF Parser, Shell Executor, API Client, Clipboard
 - **Tool Registry** - Thread-safe tool management and execution
 - **Permission System** - Allow/Deny/Prompt policies for tool execution
 - **Process Isolation** - Sandboxed subprocess execution with timeout enforcement
 - **Audit Logging** - Security event tracking for compliance
 - **Path & Command Validation** - Prevent unauthorized access and dangerous operations
+
+### API & Execution Patterns (Phase 4) 🆕
+- **REST API** - Full HTTP API with Axum for workflow and execution management
+- **WebSocket Support** - Real-time execution event streaming with bidirectional control
+- **Parallel Execution** - Concurrent agent execution with tokio::spawn
+- **Merge Strategies** - Concat, Vote, and LLM-based result merging
+- **Timeout & Cancellation** - Graceful shutdown with CancellationToken
+- **Unified Executor** - Single executor supporting sequential, parallel, and DAG modes
+- **Integration Tests** - Comprehensive end-to-end workflow testing
 
 ## Installation
 
@@ -225,6 +234,105 @@ agents:
   - id: summarizer
     type: base
     task: "Summarize: {analyzer.output}"
+```
+
+Variables are resolved at runtime using the execution context.
+
+### Parallel Execution (Phase 4)
+
+Execute multiple agents concurrently:
+
+```yaml
+name: "Parallel Analysis"
+mode: parallel  # Agents run concurrently
+
+agents:
+  - id: analyzer1
+    type: base
+    task: "Analyze dataset A"
+  
+  - id: analyzer2
+    type: base
+    task: "Analyze dataset B"
+  
+  - id: analyzer3
+    type: base
+    task: "Analyze dataset C"
+```
+
+Results can be merged using different strategies:
+- **concat**: Concatenate all results with newlines
+- **vote**: Return most common result
+- **llm_merge**: Intelligently synthesize results using LLM
+
+## REST API (Phase 4)
+
+RustForge provides a full REST API for workflow management and execution.
+
+### Start API Server
+
+```bash
+rustforge serve --port 8080
+```
+
+### API Endpoints
+
+**Workflow Management:**
+- `POST /api/workflows` - Create workflow
+- `GET /api/workflows` - List workflows
+- `GET /api/workflows/:id` - Get workflow details
+- `DELETE /api/workflows/:id` - Delete workflow
+
+**Execution:**
+- `POST /api/workflows/:id/execute` - Execute workflow
+- `GET /api/executions/:id` - Get execution status
+- `GET /api/executions` - List executions
+- `POST /api/executions/:id/pause` - Pause execution
+- `POST /api/executions/:id/resume` - Resume execution
+- `DELETE /api/executions/:id` - Cancel execution
+
+**WebSocket:**
+- `WS /api/ws/executions/:id` - Real-time execution events
+
+### Example: Execute Workflow via API
+
+```bash
+# Create workflow
+curl -X POST http://localhost:8080/api/workflows \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "API Test",
+    "mode": "parallel",
+    "agents": [
+      {"id": "agent1", "type": "base", "task": "Task 1"},
+      {"id": "agent2", "type": "base", "task": "Task 2"}
+    ]
+  }'
+
+# Execute workflow
+curl -X POST http://localhost:8080/api/workflows/{id}/execute
+
+# Get execution status
+curl http://localhost:8080/api/executions/{execution_id}
+```
+
+### WebSocket Events
+
+Connect to WebSocket for real-time execution updates:
+
+```javascript
+const ws = new WebSocket('ws://localhost:8080/api/ws/executions/{id}');
+
+ws.onmessage = (event) => {
+  const data = JSON.parse(event.data);
+  console.log('Event:', data);
+  // Events: TaskStarted, TaskCompleted, TaskFailed
+};
+
+// Send control commands
+ws.send(JSON.stringify({ type: 'pause' }));
+ws.send(JSON.stringify({ type: 'resume' }));
+ws.send(JSON.stringify({ type: 'cancel' }));
 ```
 
 Variables are resolved at runtime using the execution context.
