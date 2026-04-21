@@ -1,0 +1,11 @@
+name: "Invalid - Non-existent Dependency"
+mode: dag
+agents:
+  - id: agent1
+    type: TestAgent
+    task: "First task"
+  - id: agent2
+    type: TestAgent
+    task: "Second task"
+    depends_on:
+      - nonexistent_agent

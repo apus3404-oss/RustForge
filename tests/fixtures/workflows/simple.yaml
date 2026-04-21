@@ -1,0 +1,6 @@
+name: "Simple Test"
+mode: sequential
+agents:
+  - id: agent1
+    type: TestAgent
+    task: "Do something"

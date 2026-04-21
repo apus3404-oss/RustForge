@@ -1,0 +1,61 @@
+# RustForge Configuration Example
+# Copy this file to config.toml and customize as needed
+
+[llm]
+# Default LLM model to use
+default_model = "gpt-4"
+# Temperature for LLM responses (0.0 - 1.0)
+default_temperature = 0.7
+# Maximum tokens for LLM responses
+default_max_tokens = 2048
+
+# LLM Provider configurations
+[[llm.providers]]
+name = "openai"
+api_key_env = "OPENAI_API_KEY"
+base_url = "https://api.openai.com/v1"
+models = ["gpt-4", "gpt-3.5-turbo"]
+
+[[llm.providers]]
+name = "ollama"
+api_key_env = ""
+base_url = "http://localhost:11434"
+models = ["llama3", "codellama"]
+
+[execution]
+# Maximum number of agents that can run in parallel
+max_parallel_agents = 10
+# Default timeout for agent execution (in seconds)
+default_timeout = 300
+# Number of retry attempts for failed operations
+retry_attempts = 3
+# Delay between retry attempts (in seconds)
+retry_delay = 1
+
+[permissions]
+# Require user approval for agent actions
+require_approval = true
+# Commands that are always allowed (no approval needed)
+allowed_commands = []
+# Commands that are always blocked
+blocked_commands = []
+# Policy rules for specific operations
+# policies = { "file_write" = "prompt", "network" = "allow" }
+
+[ui]
+# Enable the web UI
+enabled = true
+# Port for the web UI server
+port = 3000
+# Host address to bind to
+host = "127.0.0.1"
+
+[logging]
+# Log level: trace, debug, info, warn, error
+level = "info"
+# Log format: json, pretty, compact
+format = "pretty"
+# Enable logging to file
+log_to_file = false
+# Path to log file (optional)
+# log_file_path = "/path/to/rustforge.log"
