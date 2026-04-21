@@ -6,6 +6,7 @@ pub mod events;
 pub mod executor;
 pub mod parallel;
 pub mod merge;
+pub mod unified_executor;
 
 pub use types::*;
 pub use parser::WorkflowParser;
@@ -14,3 +15,4 @@ pub use events::{EventBus, AgentEvent};
 pub use executor::SequentialExecutor;
 pub use parallel::ParallelExecutor;
 pub use merge::{MergeStrategy, merge_results};
+pub use unified_executor::WorkflowExecutor;
