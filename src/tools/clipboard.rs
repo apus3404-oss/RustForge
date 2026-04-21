@@ -93,7 +93,7 @@ impl Tool for ClipboardTool {
             .ok_or_else(|| Error::Internal("Missing operation parameter".to_string()))?;
 
         // Clone clipboard for mutable operations
-        let mut clipboard = Clipboard::new().map_err(|e| {
+        let clipboard = Clipboard::new().map_err(|e| {
             Error::Internal(format!("Failed to access clipboard: {}", e))
         })?;
 

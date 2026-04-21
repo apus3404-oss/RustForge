@@ -4,8 +4,8 @@ use crate::tools::traits::Tool;
 use crate::tools::types::{ParameterType, ToolParameter, ToolResult};
 use serde_json::{json, Value};
 use std::collections::HashMap;
-use std::process::{Command, Stdio};
 use std::time::Duration;
+use tokio::process::Command;
 
 pub struct ShellExecutorTool {
     allowed_commands: Vec<String>,
@@ -61,18 +61,17 @@ impl ShellExecutorTool {
         let shell_arg = "/C";
 
         let mut cmd = Command::new(shell);
-        cmd.arg(shell_arg)
-            .arg(command)
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped());
+        cmd.arg(shell_arg).arg(command);
 
         if let Some(dir) = working_dir {
             cmd.current_dir(dir);
         }
 
-        let output = cmd.output().map_err(|e| {
-            Error::Internal(format!("Failed to execute command: {}", e))
-        })?;
+        // Execute with timeout
+        let output = tokio::time::timeout(self.timeout, cmd.output())
+            .await
+            .map_err(|_| Error::Internal("Command execution timeout".to_string()))?
+            .map_err(|e| Error::Internal(format!("Failed to execute command: {}", e)))?;
 
         let stdout = String::from_utf8_lossy(&output.stdout).to_string();
         let stderr = String::from_utf8_lossy(&output.stderr).to_string();
