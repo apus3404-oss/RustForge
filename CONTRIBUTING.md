@@ -4,7 +4,7 @@ Thank you for your interest in contributing to RustForge! This document provides
 
 ## Project Status
 
-RustForge is currently in **Phase 1: Core Foundation**. We've completed the foundational infrastructure and are preparing for Phase 2 (LLM & Agent Layer).
+RustForge is currently in **Phase 2: LLM + Agent Layer**. We've completed the core foundation and LLM integration with Ollama and OpenAI providers. Phase 3 (Tool & Security Layer) is next.
 
 ## How to Contribute
 
@@ -194,23 +194,26 @@ cargo test --test integration
 
 ## Areas for Contribution
 
-### Phase 1 (Current)
+### Phase 2 (Current)
 
-- Bug fixes in core infrastructure
+- Bug fixes in LLM integration
+- Additional LLM provider support (Anthropic, local models)
+- Memory store improvements
+- Agent system enhancements
 - Documentation improvements
 - Additional test coverage
-- Performance optimizations
-- Error message improvements
 
-### Phase 2 (Upcoming)
+### Phase 3 (Next)
 
-- LLM provider integrations (Ollama, OpenAI, Anthropic)
-- Agent implementations
-- Tool/function calling support
-- Prompt engineering utilities
+- Tool system implementation
+- Function calling support
+- Permission and security layer
+- Sandboxed execution
+- Tool registry and discovery
 
-### Phase 3 (Future)
+### Phase 4+ (Future)
 
+- API execution layer
 - Parallel execution mode
 - Web UI dashboard
 - Plugin system

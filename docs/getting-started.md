@@ -2,15 +2,18 @@
 
 This guide will walk you through setting up RustForge, creating your first workflow, and understanding the core concepts.
 
+**Current Version:** Phase 2 - LLM + Agent Layer
+
 ## Table of Contents
 
 1. [Installation](#installation)
-2. [Your First Project](#your-first-project)
-3. [Understanding Workflows](#understanding-workflows)
-4. [Variable Interpolation](#variable-interpolation)
-5. [Configuration](#configuration)
-6. [Common Patterns](#common-patterns)
-7. [Troubleshooting](#troubleshooting)
+2. [LLM Setup](#llm-setup)
+3. [Your First Project](#your-first-project)
+4. [Understanding Workflows](#understanding-workflows)
+5. [Variable Interpolation](#variable-interpolation)
+6. [Configuration](#configuration)
+7. [Common Patterns](#common-patterns)
+8. [Troubleshooting](#troubleshooting)
 
 ## Installation
 
@@ -63,6 +66,55 @@ sudo ln -s /path/to/RustForge/target/release/rustforge /usr/local/bin/rustforge
 # Add to PATH via System Properties > Environment Variables
 # Or copy rustforge.exe to a directory already in PATH
 ```
+
+## LLM Setup
+
+RustForge supports two LLM providers: **Ollama** (local) and **OpenAI** (cloud). You need at least one configured.
+
+### Option 1: Ollama (Recommended for Privacy)
+
+**Install Ollama:**
+```bash
+# Linux/macOS
+curl -fsSL https://ollama.ai/install.sh | sh
+
+# Or visit https://ollama.ai for other platforms
+```
+
+**Pull a model:**
+```bash
+# Recommended: Llama 2 (7B)
+ollama pull llama2
+
+# Or other models
+ollama pull mistral
+ollama pull codellama
+```
+
+**Verify:**
+```bash
+ollama list
+```
+
+### Option 2: OpenAI (Cloud Fallback)
+
+**Set API key:**
+```bash
+# Linux/macOS
+export OPENAI_API_KEY="sk-your-api-key-here"
+
+# Add to ~/.bashrc or ~/.zshrc for persistence
+echo 'export OPENAI_API_KEY="sk-your-api-key-here"' >> ~/.bashrc
+```
+
+**Windows:**
+```powershell
+$env:OPENAI_API_KEY="sk-your-api-key-here"
+```
+
+### Hybrid Setup (Best of Both Worlds)
+
+Configure both providers - RustForge will use Ollama by default and automatically fall back to OpenAI if Ollama is unavailable.
 
 ## Your First Project
 
@@ -129,11 +181,11 @@ mode: sequential
 
 agents:
   - id: step1
-    type: ExampleAgent
+    type: base
     task: "First task description"
   
   - id: step2
-    type: ExampleAgent
+    type: base
     task: "Second task description"
 ```
 
@@ -158,19 +210,19 @@ mode: sequential
 
 agents:
   - id: reader
-    type: DocumentReader
+    type: base
     task: "Read the document from {input.file_path}"
   
   - id: analyzer
-    type: TextAnalyzer
+    type: base
     task: "Analyze the content: {reader.output}"
   
   - id: summarizer
-    type: Summarizer
+    type: base
     task: "Create a summary of: {analyzer.output}"
   
   - id: formatter
-    type: Formatter
+    type: base
     task: "Format the summary as markdown: {summarizer.output}"
 ```
 
@@ -222,11 +274,11 @@ mode: sequential
 
 agents:
   - id: greeter
-    type: GreeterAgent
+    type: base
     task: "Greet {input.name} who is a {input.role}"
   
   - id: follow_up
-    type: FollowUpAgent
+    type: base
     task: "Based on this greeting: {greeter.output}, ask about their day"
 ```
 
@@ -246,23 +298,23 @@ mode: sequential
 
 agents:
   - id: fetch
-    type: DataFetcher
+    type: base
     task: "Fetch data from {input.source}"
   
   - id: clean
-    type: DataCleaner
+    type: base
     task: "Clean this data: {fetch.output}"
   
   - id: transform
-    type: DataTransformer
+    type: base
     task: "Transform cleaned data: {clean.output}"
   
   - id: analyze
-    type: DataAnalyzer
+    type: base
     task: "Analyze: {transform.output}"
   
   - id: report
-    type: ReportGenerator
+    type: base
     task: "Generate report from analysis: {analyze.output}"
 ```
 
@@ -390,19 +442,19 @@ mode: sequential
 
 agents:
   - id: researcher
-    type: ResearchAgent
+    type: base
     task: "Research topic: {input.topic}"
   
   - id: fact_checker
-    type: FactChecker
+    type: base
     task: "Verify facts in: {researcher.output}"
   
   - id: analyst
-    type: AnalystAgent
+    type: base
     task: "Analyze verified research: {fact_checker.output}"
   
   - id: writer
-    type: WriterAgent
+    type: base
     task: "Write article based on: {analyst.output}"
 ```
 
@@ -414,23 +466,23 @@ mode: sequential
 
 agents:
   - id: ideator
-    type: IdeaGenerator
+    type: base
     task: "Generate content ideas for: {input.theme}"
   
   - id: outliner
-    type: OutlineCreator
+    type: base
     task: "Create outline from ideas: {ideator.output}"
   
   - id: writer
-    type: ContentWriter
+    type: base
     task: "Write content following outline: {outliner.output}"
   
   - id: editor
-    type: EditorAgent
+    type: base
     task: "Edit and improve: {writer.output}"
   
   - id: formatter
-    type: FormatterAgent
+    type: base
     task: "Format as {input.format}: {editor.output}"
 ```
 
@@ -442,23 +494,23 @@ mode: sequential
 
 agents:
   - id: analyzer
-    type: CodeAnalyzer
+    type: base
     task: "Analyze code: {input.code}"
   
   - id: security_checker
-    type: SecurityScanner
+    type: base
     task: "Check for security issues: {analyzer.output}"
   
   - id: performance_reviewer
-    type: PerformanceReviewer
+    type: base
     task: "Review performance: {analyzer.output}"
   
   - id: style_checker
-    type: StyleChecker
+    type: base
     task: "Check code style: {input.code}"
   
   - id: report_generator
-    type: ReportGenerator
+    type: base
     task: "Generate review report from: {security_checker.output}, {performance_reviewer.output}, {style_checker.output}"
 ```
 
@@ -531,7 +583,8 @@ Now that you understand the basics:
 1. **Explore Examples** - Check `tests/fixtures/workflows/` for more examples
 2. **Read the Design Docs** - See `docs/specs/design.md` for architecture details
 3. **Experiment** - Create your own workflows and test different patterns
-4. **Wait for Phase 2** - Real AI agent implementations coming soon!
+4. **Configure LLMs** - Set up Ollama for local execution or OpenAI for cloud fallback
+5. **Build Custom Agents** - Phase 3 will add specialized agent types and tool calling
 
 ## Getting Help
 
@@ -541,4 +594,4 @@ Now that you understand the basics:
 
 ---
 
-**Remember:** Phase 1 is the foundation. The executor is a stub that validates your workflow structure. Phase 2 will add real AI agents that execute tasks using LLMs.
+**Remember:** Phase 2 provides real LLM integration with Ollama and OpenAI. The BaseAgent executes tasks using actual LLM calls. Phase 3 will add specialized agent types, tool calling, and advanced features.
