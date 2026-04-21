@@ -45,6 +45,50 @@ impl Default for GlobalConfig {
     }
 }
 
+impl GlobalConfig {
+    /// Merge another config into this one, with the other config taking priority
+    pub fn merge(&mut self, other: GlobalConfig) {
+        // Merge LLM config
+        if !other.llm.providers.is_empty() {
+            self.llm.providers = other.llm.providers;
+        }
+        self.llm.default_model = other.llm.default_model;
+        self.llm.default_temperature = other.llm.default_temperature;
+        self.llm.default_max_tokens = other.llm.default_max_tokens;
+
+        // Merge execution config
+        self.execution.max_parallel_agents = other.execution.max_parallel_agents;
+        self.execution.default_timeout = other.execution.default_timeout;
+        self.execution.retry_attempts = other.execution.retry_attempts;
+        self.execution.retry_delay = other.execution.retry_delay;
+
+        // Merge permissions config
+        self.permissions.require_approval = other.permissions.require_approval;
+        if !other.permissions.allowed_commands.is_empty() {
+            self.permissions.allowed_commands = other.permissions.allowed_commands;
+        }
+        if !other.permissions.blocked_commands.is_empty() {
+            self.permissions.blocked_commands = other.permissions.blocked_commands;
+        }
+        if !other.permissions.policies.is_empty() {
+            self.permissions.policies = other.permissions.policies;
+        }
+
+        // Merge UI config
+        self.ui.enabled = other.ui.enabled;
+        self.ui.port = other.ui.port;
+        self.ui.host = other.ui.host;
+
+        // Merge logging config
+        self.logging.level = other.logging.level;
+        self.logging.format = other.logging.format;
+        self.logging.log_to_file = other.logging.log_to_file;
+        if other.logging.log_file_path.is_some() {
+            self.logging.log_file_path = other.logging.log_file_path;
+        }
+    }
+}
+
 /// LLM provider configuration
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct LLMConfig {
