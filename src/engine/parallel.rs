@@ -111,4 +111,73 @@ mod tests {
         let results = executor.execute(agents, &context).await.unwrap();
         assert_eq!(results.len(), 3);
     }
+
+    #[tokio::test]
+    async fn test_parallel_execution_collects_all_results() {
+        let event_bus = Arc::new(EventBus::new());
+        let executor = ParallelExecutor::new(event_bus.clone());
+
+        let agents = vec![
+            AgentConfig {
+                id: "agent1".to_string(),
+                agent_type: "test".to_string(),
+                task: "Task A".to_string(),
+                depends_on: vec![],
+                config: HashMap::new(),
+            },
+            AgentConfig {
+                id: "agent2".to_string(),
+                agent_type: "test".to_string(),
+                task: "Task B".to_string(),
+                depends_on: vec![],
+                config: HashMap::new(),
+            },
+        ];
+
+        let context = ExecutionContext::new("test-workflow".to_string());
+        let results = executor.execute(agents, &context).await.unwrap();
+
+        assert_eq!(results.len(), 2);
+        assert!(results[0].contains("agent1"));
+        assert!(results[1].contains("agent2"));
+    }
+
+    #[tokio::test]
+    async fn test_parallel_execution_publishes_events() {
+        let event_bus = Arc::new(EventBus::new());
+        let mut subscriber = event_bus.subscribe();
+        let executor = ParallelExecutor::new(event_bus.clone());
+
+        let agents = vec![AgentConfig {
+            id: "agent1".to_string(),
+            agent_type: "test".to_string(),
+            task: "Test task".to_string(),
+            depends_on: vec![],
+            config: HashMap::new(),
+        }];
+
+        let context = ExecutionContext::new("test-workflow".to_string());
+
+        // Execute in background
+        let exec_handle = tokio::spawn(async move {
+            executor.execute(agents, &context).await
+        });
+
+        // Collect events
+        let mut events = Vec::new();
+        for _ in 0..2 {
+            if let Ok(event) = tokio::time::timeout(
+                std::time::Duration::from_secs(1),
+                subscriber.recv()
+            ).await {
+                events.push(event.unwrap());
+            }
+        }
+
+        exec_handle.await.unwrap().unwrap();
+
+        assert_eq!(events.len(), 2);
+        assert!(matches!(events[0], AgentEvent::TaskStarted { .. }));
+        assert!(matches!(events[1], AgentEvent::TaskCompleted { .. }));
+    }
 }
