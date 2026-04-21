@@ -29,7 +29,28 @@ fn concat_results(results: Vec<String>) -> Result<String> {
 }
 
 fn vote_results(results: Vec<String>) -> Result<String> {
-    todo!("Implement vote strategy")
+    use std::collections::HashMap;
+
+    if results.is_empty() {
+        return Err(crate::error::Error::Internal(
+            "Cannot vote on empty results".to_string(),
+        ));
+    }
+
+    // Count occurrences of each result
+    let mut counts: HashMap<String, usize> = HashMap::new();
+    for result in &results {
+        *counts.entry(result.clone()).or_insert(0) += 1;
+    }
+
+    // Find the result with maximum count
+    let winner = counts
+        .iter()
+        .max_by_key(|(_, count)| *count)
+        .map(|(result, _)| result.clone())
+        .unwrap(); // Safe because we checked results is not empty
+
+    Ok(winner)
 }
 
 async fn llm_merge_results(results: Vec<String>) -> Result<String> {
@@ -56,5 +77,50 @@ mod tests {
         assert!(merged.contains("Result from agent2"));
         assert!(merged.contains("Result from agent3"));
         assert_eq!(merged.lines().count(), 3);
+    }
+
+    #[tokio::test]
+    async fn test_vote_strategy_with_clear_winner() {
+        let results = vec![
+            "Option A".to_string(),
+            "Option B".to_string(),
+            "Option A".to_string(),
+            "Option A".to_string(),
+            "Option B".to_string(),
+        ];
+
+        let merged = merge_results(results, MergeStrategy::Vote)
+            .await
+            .unwrap();
+
+        assert_eq!(merged, "Option A");
+    }
+
+    #[tokio::test]
+    async fn test_vote_strategy_with_tie() {
+        let results = vec![
+            "Option A".to_string(),
+            "Option B".to_string(),
+            "Option A".to_string(),
+            "Option B".to_string(),
+        ];
+
+        let merged = merge_results(results, MergeStrategy::Vote)
+            .await
+            .unwrap();
+
+        // With tie, return first most common option
+        assert!(merged == "Option A" || merged == "Option B");
+    }
+
+    #[tokio::test]
+    async fn test_vote_strategy_single_result() {
+        let results = vec!["Only result".to_string()];
+
+        let merged = merge_results(results, MergeStrategy::Vote)
+            .await
+            .unwrap();
+
+        assert_eq!(merged, "Only result");
     }
 }
