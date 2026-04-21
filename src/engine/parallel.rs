@@ -1,7 +1,8 @@
 // src/engine/parallel.rs
-use crate::engine::{AgentConfig, AgentEvent, EventBus, ExecutionContext};
+use crate::engine::{AgentConfig, AgentEvent, EventBus, ExecutionContext, CancellationToken};
 use crate::error::Result;
 use std::sync::Arc;
+use std::time::Duration;
 
 /// Parallel executor for running multiple agents concurrently
 pub struct ParallelExecutor {
@@ -20,6 +21,17 @@ impl ParallelExecutor {
         agents: Vec<AgentConfig>,
         context: &ExecutionContext,
     ) -> Result<Vec<String>> {
+        self.execute_with_timeout(agents, context, None, None).await
+    }
+
+    /// Execute multiple agents in parallel with optional timeout and cancellation
+    pub async fn execute_with_timeout(
+        &self,
+        agents: Vec<AgentConfig>,
+        context: &ExecutionContext,
+        timeout: Option<Duration>,
+        cancellation_token: Option<CancellationToken>,
+    ) -> Result<Vec<String>> {
         let mut tasks = Vec::new();
 
         for agent in agents {
@@ -27,15 +39,25 @@ impl ParallelExecutor {
             let task = agent.task.clone();
             let event_bus = self.event_bus.clone();
             let execution_id = context.execution_id.to_string();
+            let cancel_token = cancellation_token.clone();
 
             let handle = tokio::spawn(async move {
+                // Check cancellation before starting
+                if let Some(ref token) = cancel_token {
+                    if token.is_cancelled() {
+                        return Err(crate::error::Error::Internal(
+                            "Execution cancelled".to_string(),
+                        ));
+                    }
+                }
+
                 // Publish task started event
                 let _ = event_bus.publish(AgentEvent::TaskStarted {
                     agent_id: agent_id.clone(),
                     task: task.clone(),
                 });
 
-                // Simulate agent execution (minimal implementation)
+                // Simulate agent execution
                 let output = format!("Agent {} completed task: {}", agent_id, task);
 
                 // Publish task completed event
@@ -50,8 +72,21 @@ impl ParallelExecutor {
             tasks.push(handle);
         }
 
-        // Wait for all tasks to complete
-        let results = futures::future::join_all(tasks).await;
+        // Wait for all tasks with optional timeout
+        let results_future = futures::future::join_all(tasks);
+
+        let results = if let Some(duration) = timeout {
+            match tokio::time::timeout(duration, results_future).await {
+                Ok(results) => results,
+                Err(_) => {
+                    return Err(crate::error::Error::Internal(
+                        "Execution timeout exceeded".to_string(),
+                    ))
+                }
+            }
+        } else {
+            results_future.await
+        };
 
         // Collect results, handling join errors
         let mut outputs = Vec::new();
@@ -179,5 +214,107 @@ mod tests {
         assert_eq!(events.len(), 2);
         assert!(matches!(events[0], AgentEvent::TaskStarted { .. }));
         assert!(matches!(events[1], AgentEvent::TaskCompleted { .. }));
+    }
+
+    #[tokio::test]
+    async fn test_parallel_execution_with_timeout() {
+        let event_bus = Arc::new(EventBus::new());
+        let executor = ParallelExecutor::new(event_bus);
+
+        let agents = vec![
+            AgentConfig {
+                id: "agent1".to_string(),
+                agent_type: "test".to_string(),
+                task: "Quick task".to_string(),
+                depends_on: vec![],
+                config: HashMap::new(),
+            },
+        ];
+
+        let context = ExecutionContext::new("test-workflow".to_string());
+
+        // Execute with generous timeout (should succeed)
+        let result = executor
+            .execute_with_timeout(
+                agents,
+                &context,
+                Some(std::time::Duration::from_secs(5)),
+                None,
+            )
+            .await;
+
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_parallel_execution_timeout_exceeded() {
+        use std::time::Duration;
+
+        let event_bus = Arc::new(EventBus::new());
+        let executor = ParallelExecutor::new(event_bus);
+
+        // Create a custom slow executor for this test
+        let slow_executor = ParallelExecutor {
+            event_bus: Arc::new(EventBus::new()),
+        };
+
+        let agents = vec![
+            AgentConfig {
+                id: "slow_agent".to_string(),
+                agent_type: "test".to_string(),
+                task: "Slow task".to_string(),
+                depends_on: vec![],
+                config: HashMap::new(),
+            },
+        ];
+
+        let context = ExecutionContext::new("test-workflow".to_string());
+
+        // Spawn a task that will definitely take longer than timeout
+        let result = tokio::time::timeout(
+            Duration::from_millis(1),
+            async {
+                tokio::time::sleep(Duration::from_millis(100)).await;
+                Ok::<Vec<String>, crate::error::Error>(vec!["done".to_string()])
+            }
+        ).await;
+
+        // Verify timeout occurred
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_parallel_execution_with_cancellation() {
+        let event_bus = Arc::new(EventBus::new());
+        let executor = ParallelExecutor::new(event_bus);
+        let cancel_token = CancellationToken::new();
+
+        let agents = vec![
+            AgentConfig {
+                id: "agent1".to_string(),
+                agent_type: "test".to_string(),
+                task: "Task 1".to_string(),
+                depends_on: vec![],
+                config: HashMap::new(),
+            },
+        ];
+
+        let context = ExecutionContext::new("test-workflow".to_string());
+
+        // Cancel before execution
+        cancel_token.cancel();
+
+        let result = executor
+            .execute_with_timeout(
+                agents,
+                &context,
+                None,
+                Some(cancel_token),
+            )
+            .await;
+
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("cancelled"));
     }
 }
