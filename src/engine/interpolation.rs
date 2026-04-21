@@ -4,6 +4,9 @@ use crate::error::{Error, Result};
 use regex::Regex;
 use std::sync::OnceLock;
 
+const MAX_SUGGESTION_DISTANCE: usize = 3;
+const MAX_SUGGESTIONS: usize = 3;
+
 pub struct VariableInterpolator<'a> {
     context: &'a ExecutionContext,
 }
@@ -20,7 +23,7 @@ impl<'a> VariableInterpolator<'a> {
         });
 
         let mut result = template.to_string();
-        let mut errors = Vec::new();
+        let mut missing_variables = Vec::new();
 
         // Collect all matches first to avoid borrow issues
         let matches: Vec<_> = regex
@@ -33,14 +36,34 @@ impl<'a> VariableInterpolator<'a> {
                 Ok(value) => {
                     result = result.replace(full_match, &value);
                 }
+                Err(Error::VariableNotFound { variable, suggestions }) => {
+                    missing_variables.push((variable, suggestions));
+                }
                 Err(e) => {
-                    errors.push(e);
+                    return Err(e);
                 }
             }
         }
 
-        if let Some(err) = errors.into_iter().next() {
-            return Err(err);
+        // Report all missing variables together
+        if !missing_variables.is_empty() {
+            if missing_variables.len() == 1 {
+                let (variable, suggestions) = missing_variables.into_iter().next().unwrap();
+                return Err(Error::VariableNotFound { variable, suggestions });
+            } else {
+                // Multiple missing variables - combine into one error
+                let variables: Vec<String> = missing_variables.iter()
+                    .map(|(v, _)| v.clone())
+                    .collect();
+                let all_suggestions: Vec<String> = missing_variables.into_iter()
+                    .flat_map(|(_, s)| s)
+                    .collect();
+
+                return Err(Error::VariableNotFound {
+                    variable: format!("Multiple variables not found: {}", variables.join(", ")),
+                    suggestions: all_suggestions,
+                });
+            }
         }
 
         Ok(result)
@@ -85,11 +108,11 @@ impl<'a> VariableInterpolator<'a> {
                 let distance = levenshtein_distance(target, key);
                 (key.clone(), distance)
             })
-            .filter(|(_, distance)| *distance <= 3) // Only suggest if distance <= 3
+            .filter(|(_, distance)| *distance <= MAX_SUGGESTION_DISTANCE)
             .collect();
 
         candidates.sort_by_key(|(_, distance)| *distance);
-        candidates.into_iter().map(|(key, _)| key).take(3).collect()
+        candidates.into_iter().map(|(key, _)| key).take(MAX_SUGGESTIONS).collect()
     }
 }
 
@@ -292,5 +315,52 @@ mod tests {
             .interpolate("Enabled: {input.enabled}, Disabled: {input.disabled}, Empty: {input.empty}")
             .unwrap();
         assert_eq!(result, "Enabled: true, Disabled: false, Empty: null");
+    }
+
+    #[test]
+    fn test_interpolate_array_indexing() {
+        let mut context = ExecutionContext::new("test-workflow".to_string());
+        context.set_value(
+            "agent1.output",
+            json!({
+                "items": ["first", "second", "third"],
+                "nested": {
+                    "list": [10, 20, 30]
+                }
+            }),
+        );
+
+        let interpolator = VariableInterpolator::new(&context);
+
+        // Test array indexing
+        let result = interpolator
+            .interpolate("Item: {agent1.output.items.0}")
+            .unwrap();
+        assert_eq!(result, "Item: first");
+
+        // Test nested array indexing
+        let result = interpolator
+            .interpolate("Value: {agent1.output.nested.list.1}")
+            .unwrap();
+        assert_eq!(result, "Value: 20");
+    }
+
+    #[test]
+    fn test_interpolate_multiple_missing_variables() {
+        let mut context = ExecutionContext::new("test-workflow".to_string());
+        context.set_value("input.name", json!("Alice"));
+
+        let interpolator = VariableInterpolator::new(&context);
+        let result = interpolator.interpolate("Hello {input.name}, your age is {input.age} and city is {input.city}");
+
+        assert!(result.is_err());
+        match result {
+            Err(Error::VariableNotFound { variable, .. }) => {
+                assert!(variable.contains("Multiple variables not found"));
+                assert!(variable.contains("input.age"));
+                assert!(variable.contains("input.city"));
+            }
+            _ => panic!("Expected VariableNotFound error with multiple variables"),
+        }
     }
 }
