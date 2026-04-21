@@ -196,11 +196,11 @@ mode: sequential  # Execution mode (sequential only in Phase 1)
 
 agents:
   - id: agent1           # Unique identifier
-    type: AgentType      # Agent type (Phase 2 will add real types)
+    type: base           # Agent type (currently 'base', more types in Phase 3)
     task: "Task description"
     
   - id: agent2
-    type: AgentType
+    type: base
     task: "Use output from agent1: {agent1.output}"
 ```
 
@@ -211,11 +211,11 @@ Reference outputs from previous agents or workflow inputs:
 ```yaml
 agents:
   - id: analyzer
-    type: AnalyzerAgent
+    type: base
     task: "Analyze: {input.document}"
   
   - id: summarizer
-    type: SummarizerAgent
+    type: base
     task: "Summarize: {analyzer.output}"
 ```
 
@@ -325,19 +325,27 @@ rustforge/
 
 ## Roadmap
 
-- ✅ **Phase 1: Core Foundation** (Current)
+- ✅ **Phase 1: Core Foundation** (Completed)
   - Config management, CLI, storage, workflow engine
   
-- 🚧 **Phase 2: LLM & Agent Layer** (Next)
-  - Real AI agent implementations
-  - LLM provider integrations (Ollama, OpenAI, Anthropic)
-  - Tool/function calling support
+- ✅ **Phase 2: LLM & Agent Layer** (Completed)
+  - Real AI agent implementations with BaseAgent
+  - LLM provider integrations (Ollama, OpenAI)
+  - Memory store for conversation history
+  - Thread-safe registries for agents and providers
   
-- 📋 **Phase 3: Advanced Features**
+- 🚧 **Phase 3: Tool & Security Layer** (Next)
+  - Tool system implementation
+  - Function calling support
+  - Permission and security layer
+  - Sandboxed execution
+  
+- 📋 **Phase 4+: Advanced Features**
+  - API execution layer
   - Parallel execution mode
   - Web UI dashboard
   - Plugin system
-  - Advanced error handling and retry logic
+  - Additional LLM providers (Anthropic, etc.)
 
 ## Contributing
 
@@ -355,4 +363,4 @@ MIT License - see LICENSE file for details.
 
 ---
 
-**Note:** Phase 1 includes a stub executor for testing the infrastructure. Real AI agent implementations will be added in Phase 2. The current version is perfect for testing workflow definitions, configuration, and the execution pipeline.
+**Note:** Phase 2 is complete with real LLM integration (Ollama + OpenAI) and agent execution. The BaseAgent now executes workflows with actual LLM calls. Phase 3 will add specialized agent types, tool calling, and security features.
