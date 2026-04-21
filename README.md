@@ -6,12 +6,13 @@
 
 RustForge is a high-performance orchestration engine for AI agent workflows. Define multi-agent workflows in YAML, execute them locally with full control over your data, and leverage powerful features like variable interpolation, checkpointing, and real-time event streaming.
 
-**Current Status:** Phase 1 - Core Foundation ✅
+**Current Status:** Phase 2 - LLM + Agent Layer ✅
 
-Phase 1 provides the complete infrastructure for workflow management, configuration, storage, and execution orchestration. Real AI agent implementations will be added in Phase 2.
+Phase 2 adds complete LLM integration (Ollama + OpenAI), agent system, and memory management. Real agents now execute workflows with actual LLM calls.
 
 ## Features
 
+### Core Foundation (Phase 1)
 - **YAML-based Workflow Definitions** - Simple, declarative workflow syntax
 - **Sequential Execution Engine** - Reliable step-by-step agent orchestration
 - **Variable Interpolation** - Dynamic context passing between agents with `{agent_id.output}` syntax
@@ -20,12 +21,22 @@ Phase 1 provides the complete infrastructure for workflow management, configurat
 - **Flexible Configuration** - Multi-layer config system (defaults → user → project → env vars)
 - **CLI Interface** - Intuitive commands for workflow management
 
+### LLM + Agent Layer (Phase 2) 🆕
+- **Ollama Integration** - Local LLM support for privacy-focused execution
+- **OpenAI Fallback** - Automatic cloud fallback when local LLM unavailable
+- **Agent System** - BaseAgent with LLM provider integration
+- **Memory Store** - Conversation history persistence with redb
+- **Real Agent Execution** - Workflows now execute with actual LLM calls
+- **Thread-Safe Registries** - Concurrent agent and LLM provider management
+
 ## Installation
 
 ### Prerequisites
 
 - Rust 1.70+ and Cargo
 - Git
+- **Ollama** (optional, for local LLM) - [Install Ollama](https://ollama.ai)
+- **OpenAI API Key** (optional, for cloud fallback)
 
 ### Build from Source
 
@@ -39,6 +50,23 @@ cargo build --release
 
 # Binary will be at target/release/rustforge
 ./target/release/rustforge --version
+```
+
+### Setup LLM Providers
+
+**Option 1: Ollama (Local, Recommended)**
+```bash
+# Install Ollama
+curl -fsSL https://ollama.ai/install.sh | sh
+
+# Pull a model
+ollama pull llama2
+```
+
+**Option 2: OpenAI (Cloud Fallback)**
+```bash
+# Set API key
+export OPENAI_API_KEY="your-api-key"
 ```
 
 ### Add to PATH (Optional)
@@ -73,11 +101,11 @@ name: "Hello Workflow"
 mode: sequential
 agents:
   - id: greeter
-    type: ExampleAgent
+    type: base
     task: "Say hello to the user"
   
   - id: responder
-    type: ExampleAgent
+    type: base
     task: "Respond to: {greeter.output}"
 ```
 
