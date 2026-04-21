@@ -1,0 +1,17 @@
+name: "Workflow with Dependencies"
+mode: dag
+agents:
+  - id: agent1
+    type: TestAgent
+    task: "First task"
+  - id: agent2
+    type: TestAgent
+    task: "Second task"
+    depends_on:
+      - agent1
+  - id: agent3
+    type: TestAgent
+    task: "Third task"
+    depends_on:
+      - agent1
+      - agent2

@@ -1,0 +1,9 @@
+name: "Invalid - Duplicate IDs"
+mode: sequential
+agents:
+  - id: agent1
+    type: TestAgent
+    task: "First task"
+  - id: agent1
+    type: TestAgent
+    task: "Duplicate ID"
