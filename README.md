@@ -6,9 +6,9 @@
 
 RustForge is a high-performance orchestration engine for AI agent workflows. Define multi-agent workflows in YAML, execute them locally with full control over your data, and leverage powerful features like variable interpolation, checkpointing, and real-time event streaming.
 
-**Current Status:** Phase 2 - LLM + Agent Layer ✅
+**Current Status:** Phase 3 - Tool Layer & Security ✅
 
-Phase 2 adds complete LLM integration (Ollama + OpenAI), agent system, and memory management. Real agents now execute workflows with actual LLM calls.
+Phase 3 adds complete tool system with 6 built-in tools, permission management, process isolation, and audit logging. Agents can now execute tools with security controls.
 
 ## Features
 
@@ -21,13 +21,21 @@ Phase 2 adds complete LLM integration (Ollama + OpenAI), agent system, and memor
 - **Flexible Configuration** - Multi-layer config system (defaults → user → project → env vars)
 - **CLI Interface** - Intuitive commands for workflow management
 
-### LLM + Agent Layer (Phase 2) 🆕
+### LLM + Agent Layer (Phase 2)
 - **Ollama Integration** - Local LLM support for privacy-focused execution
 - **OpenAI Fallback** - Automatic cloud fallback when local LLM unavailable
 - **Agent System** - BaseAgent with LLM provider integration
 - **Memory Store** - Conversation history persistence with redb
 - **Real Agent Execution** - Workflows now execute with actual LLM calls
 - **Thread-Safe Registries** - Concurrent agent and LLM provider management
+
+### Tool Layer & Security (Phase 3) 🆕
+- **6 Built-in Tools** - FileSystem, WebScraper, PDF Parser, Shell Executor, API Client, Clipboard
+- **Tool Registry** - Thread-safe tool management and execution
+- **Permission System** - Allow/Deny/Prompt policies for tool execution
+- **Process Isolation** - Sandboxed subprocess execution with timeout enforcement
+- **Audit Logging** - Security event tracking for compliance
+- **Path & Command Validation** - Prevent unauthorized access and dangerous operations
 
 ## Installation
 
@@ -334,18 +342,25 @@ rustforge/
   - Memory store for conversation history
   - Thread-safe registries for agents and providers
   
-- 🚧 **Phase 3: Tool & Security Layer** (Next)
-  - Tool system implementation
-  - Function calling support
-  - Permission and security layer
-  - Sandboxed execution
+- ✅ **Phase 3: Tool & Security Layer** (Completed)
+  - 6 built-in tools (FileSystem, WebScraper, PDF, Shell, API, Clipboard)
+  - Tool registry and execution framework
+  - Permission system with allow/deny/prompt policies
+  - Process isolation for secure subprocess execution
+  - Audit logging for security events
+  - Path and command validation
   
-- 📋 **Phase 4+: Advanced Features**
-  - API execution layer
+- 🚧 **Phase 4: API & Execution Patterns** (Next)
+  - REST API for workflow execution
   - Parallel execution mode
+  - Advanced execution patterns
+  - Tool result caching
+  
+- 📋 **Phase 5+: Advanced Features**
   - Web UI dashboard
   - Plugin system
   - Additional LLM providers (Anthropic, etc.)
+  - Distributed execution
 
 ## Contributing
 
@@ -363,4 +378,4 @@ MIT License - see LICENSE file for details.
 
 ---
 
-**Note:** Phase 2 is complete with real LLM integration (Ollama + OpenAI) and agent execution. The BaseAgent now executes workflows with actual LLM calls. Phase 3 will add specialized agent types, tool calling, and security features.
+**Note:** Phase 3 is complete with 6 built-in tools, permission system, process isolation, and audit logging. Agents can now execute tools with security controls. Phase 4 will add REST API, parallel execution, and advanced execution patterns.
