@@ -50,6 +50,9 @@ scraper = "0.20"
 pdf-extract = "0.7"
 lopdf = "0.32"
 
+# Clipboard
+arboard = "3.4"
+
 [dev-dependencies]
 tempfile = "3.12"
 mockall = "0.13"
