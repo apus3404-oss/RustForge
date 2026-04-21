@@ -1,6 +1,7 @@
 use crate::api::{ApiError, AppState};
-use crate::engine::types::{ExecutionContext, WorkflowDefinition};
-use crate::engine::SequentialExecutor;
+use crate::engine::types::ExecutionContext;
+use crate::engine::WorkflowExecutor;
+use crate::storage::StoredExecutionStatus;
 use axum::{
     extract::{Path, State},
     http::StatusCode,
@@ -48,30 +49,36 @@ pub async fn execute_workflow(
     Path(workflow_id): Path<String>,
     Json(inputs): Json<HashMap<String, serde_json::Value>>,
 ) -> Result<Json<ExecutionResponse>, ApiError> {
-    // TODO: Load workflow from file system
-    // For now, create a dummy workflow
-    let _workflow = WorkflowDefinition {
-        name: "Test".to_string(),
-        mode: crate::engine::types::ExecutionMode::Sequential,
-        agents: vec![],
-        inputs: None,
-    };
+    // Load workflow from file system
+    let workflow = state
+        .workflow_store
+        .load(&workflow_id)
+        .map_err(|_| ApiError::not_found("Workflow", &workflow_id))?;
 
     // Create execution context
     let execution_id = Uuid::new_v4();
-    let mut context = ExecutionContext {
-        workflow_id: workflow_id.clone(),
-        execution_id,
-        context_store: HashMap::new(),
-    };
+    let mut context = ExecutionContext::new(workflow_id.clone());
 
     // Add inputs to context
     for (key, value) in inputs {
-        context.context_store.insert(format!("input.{}", key), value);
+        context.set_value(format!("input.{}", key), value);
     }
 
-    // TODO: Spawn execution in background
-    // For now, just return response
+    // Create executor
+    let executor = WorkflowExecutor::new(
+        state.event_bus.clone(),
+        state.llm_registry.primary().clone(),
+        state.agent_registry.clone(),
+    );
+
+    // Spawn execution in background
+    let state_clone = state.clone();
+    let workflow_id_clone = workflow_id.clone();
+    tokio::spawn(async move {
+        let mut exec_context = context;
+        let _result = executor.execute(&workflow, &mut exec_context).await;
+        // TODO: Store execution result in state store
+    });
 
     Ok(Json(ExecutionResponse {
         execution_id,
@@ -85,9 +92,8 @@ pub async fn get_execution(
     State(_state): State<AppState>,
     Path(execution_id): Path<Uuid>,
 ) -> Result<Json<ExecutionDetails>, ApiError> {
-    // TODO: Implement proper execution retrieval from state store
-    // StoredExecution has different fields (id, status, created_at, updated_at, data)
-    // Need to deserialize data field to get workflow_id, outputs, error
+    // TODO: Implement execution retrieval from state store
+    // For now, return not found
     Err(ApiError::not_found("Execution", &execution_id.to_string()))
 }
 
@@ -199,11 +205,29 @@ mod tests {
     #[tokio::test]
     async fn test_execute_workflow() {
         let state = create_test_state();
-        let inputs = HashMap::new();
 
+        // First create a workflow
+        let workflow = crate::engine::types::WorkflowDefinition {
+            name: "Test Workflow".to_string(),
+            mode: crate::engine::types::ExecutionMode::Sequential,
+            agents: vec![crate::engine::types::AgentConfig {
+                id: "agent1".to_string(),
+                agent_type: "base".to_string(),
+                task: "Test task".to_string(),
+                depends_on: vec![],
+                config: HashMap::new(),
+            }],
+            inputs: None,
+        };
+
+        let workflow_id = "test-workflow-exec";
+        state.workflow_store.save(workflow_id, &workflow).unwrap();
+
+        // Now execute it
+        let inputs = HashMap::new();
         let result = execute_workflow(
             State(state),
-            Path("test-workflow".to_string()),
+            Path(workflow_id.to_string()),
             Json(inputs),
         )
         .await;
