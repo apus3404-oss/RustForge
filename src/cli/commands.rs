@@ -38,6 +38,9 @@ pub enum Commands {
         workflow: PathBuf,
     },
 
+    /// List available workflows
+    List,
+
     /// Configuration management
     Config {
         #[command(subcommand)]
@@ -130,6 +133,15 @@ mod tests {
         match cli.command {
             Commands::Config { command: ConfigCommands::Show } => {}
             _ => panic!("Expected Config Show command"),
+        }
+    }
+
+    #[test]
+    fn test_cli_parse_list_command() {
+        let cli = Cli::parse_from(["rustforge", "list"]);
+        match cli.command {
+            Commands::List => {}
+            _ => panic!("Expected List command"),
         }
     }
 }

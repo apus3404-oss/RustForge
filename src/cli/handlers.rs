@@ -17,6 +17,7 @@ pub async fn handle_command(command: Commands) -> Result<()> {
             resume,
         } => handle_run(workflow, inputs, resume).await,
         Commands::Validate { workflow } => handle_validate(workflow).await,
+        Commands::List => handle_list().await,
         Commands::Config { command } => handle_config(command).await,
     }
 }
@@ -113,6 +114,26 @@ async fn handle_validate(workflow_path: PathBuf) -> Result<()> {
 
     for agent in &workflow.agents {
         println!("    - {} ({})", agent.id, agent.agent_type);
+    }
+
+    Ok(())
+}
+
+async fn handle_list() -> Result<()> {
+    let workflows_dir = Path::new("workflows");
+
+    if !workflows_dir.exists() {
+        println!("No workflows directory found. Run 'rustforge init' first.");
+        return Ok(());
+    }
+
+    println!("Available workflows:");
+    for entry in fs::read_dir(workflows_dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        if path.extension().and_then(|s| s.to_str()) == Some("yaml") {
+            println!("  - {}", path.file_stem().unwrap().to_str().unwrap());
+        }
     }
 
     Ok(())
@@ -221,6 +242,28 @@ agents:
 
         let result = handle_validate(workflow_path).await;
         assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_handle_list() {
+        let temp_dir = TempDir::new().unwrap();
+        let workflows_dir = temp_dir.path().join("workflows");
+        fs::create_dir_all(&workflows_dir).unwrap();
+
+        // Create test workflow files
+        fs::write(workflows_dir.join("workflow1.yaml"), "name: Test1\nmode: sequential\nagents: []").unwrap();
+        fs::write(workflows_dir.join("workflow2.yaml"), "name: Test2\nmode: sequential\nagents: []").unwrap();
+        fs::write(workflows_dir.join("readme.txt"), "not a workflow").unwrap();
+
+        // Change to temp directory for the test
+        let original_dir = env::current_dir().unwrap();
+        env::set_current_dir(&temp_dir).unwrap();
+
+        let result = handle_list().await;
+        assert!(result.is_ok());
+
+        // Restore original directory
+        env::set_current_dir(original_dir).unwrap();
     }
 
     #[test]
