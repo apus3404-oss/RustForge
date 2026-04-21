@@ -5,4 +5,5 @@ pub mod storage;
 pub mod engine;
 pub mod error;
 pub mod llm;
+pub mod memory;
 pub mod retry;
