@@ -7,6 +7,7 @@ pub mod executor;
 pub mod parallel;
 pub mod merge;
 pub mod unified_executor;
+pub mod cancellation;
 
 pub use types::*;
 pub use parser::WorkflowParser;
@@ -16,3 +17,4 @@ pub use executor::SequentialExecutor;
 pub use parallel::ParallelExecutor;
 pub use merge::{MergeStrategy, merge_results};
 pub use unified_executor::WorkflowExecutor;
+pub use cancellation::CancellationToken;
