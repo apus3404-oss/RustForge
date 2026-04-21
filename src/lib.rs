@@ -1,4 +1,5 @@
 pub mod agents;
+pub mod api;
 pub mod config;
 pub mod cli;
 pub mod storage;
