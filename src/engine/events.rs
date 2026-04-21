@@ -1,8 +1,9 @@
 // src/engine/events.rs
+use serde::Serialize;
 use tokio::sync::broadcast;
 
 /// Events emitted during agent task execution
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub enum AgentEvent {
     /// Agent task has started
     TaskStarted { agent_id: String, task: String },

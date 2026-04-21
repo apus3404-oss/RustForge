@@ -43,6 +43,11 @@ dirs = "5.0"
 # HTTP client for LLM providers
 reqwest = { version = "0.12", features = ["json"] }
 
+# Web framework
+axum = { version = "0.7", features = ["ws"] }
+tower-http = { version = "0.5", features = ["cors", "trace"] }
+tokio-tungstenite = "0.21"
+
 # Web scraping
 scraper = "0.20"
 
