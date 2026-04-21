@@ -119,7 +119,6 @@ impl SequentialExecutor {
         Ok(agent)
     }
 }
-}
 
 #[cfg(test)]
 mod tests {
