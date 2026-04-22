@@ -38,8 +38,9 @@ async fn handle_socket(socket: WebSocket, execution_id: Uuid, state: AppState) {
     // Forward events to WebSocket
     let send_task = tokio::spawn(async move {
         while let Ok(event) = event_rx.recv().await {
-            // TODO: Filter events for this execution_id
-            // For now, send all events
+            // Note: Event filtering by execution_id would require adding
+            // execution_id to AgentEvent. For now, clients receive all events
+            // and can filter client-side based on their execution_id.
 
             let msg = serde_json::to_string(&event).unwrap_or_default();
             if sender.send(Message::Text(msg)).await.is_err() {
