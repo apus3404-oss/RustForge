@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { workflows, executions } from '../lib/stores';
   import { navigate } from '../lib/router';
+  import { toasts } from '../lib/toast';
   import type { WorkflowDefinition } from '../lib/types';
 
   let { workflowId }: { workflowId: string } = $props();
@@ -15,6 +16,7 @@
       workflow = $workflows.find(w => w.id === workflowId) || null;
     } catch (error) {
       console.error('Failed to load workflow:', error);
+      toasts.show('Failed to load workflow', 'error');
     } finally {
       loading = false;
     }
@@ -25,11 +27,12 @@
 
     try {
       const execution = await executions.start(workflow.id, {});
-      alert(`Workflow execution started: ${execution.id}`);
+      toasts.show('Execution started successfully', 'success');
       navigate(`/executions/${execution.id}`);
     } catch (error) {
       console.error('Failed to start execution:', error);
-      alert('Failed to start execution. Check console for details.');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to start execution';
+      toasts.show(errorMessage, 'error');
     }
   }
 

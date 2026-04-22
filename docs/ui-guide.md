@@ -115,6 +115,34 @@ Configure the UI and backend connection:
 - **Auto-refresh** - Automatic data updates
 - **Theme preferences** (future)
 
+## Keyboard Shortcuts
+
+**Note:** Keyboard shortcuts are planned for a future release. The following shortcuts are proposed to improve workflow efficiency:
+
+### Workflow Builder
+
+- **Delete** - Delete selected agent node
+- **Escape** - Deselect current node
+- **Ctrl/Cmd + S** - Save workflow
+- **Ctrl/Cmd + Z** - Undo last action
+- **Ctrl/Cmd + Y** - Redo last action
+- **Ctrl/Cmd + D** - Duplicate selected node
+- **Arrow Keys** - Move selected node (with Shift for larger steps)
+
+### Execution Monitor
+
+- **Space** - Pause/Resume execution
+- **Escape** - Cancel execution (with confirmation)
+- **R** - Refresh execution status
+
+### Global
+
+- **Ctrl/Cmd + K** - Open command palette (future)
+- **/** - Focus search (future)
+- **?** - Show keyboard shortcuts help
+
+**Implementation Status:** These shortcuts are not yet implemented. To add them, keyboard event listeners would need to be added to the relevant components. Contributions welcome!
+
 ## UI Components
 
 ### Navigation
