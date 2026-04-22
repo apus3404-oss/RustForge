@@ -1,6 +1,7 @@
 <script lang="ts">
   import Navigation from './components/Navigation.svelte';
   import Router from './components/Router.svelte';
+  import Toast from './components/Toast.svelte';
 </script>
 
 <div class="app">
@@ -8,6 +9,7 @@
   <main>
     <Router />
   </main>
+  <Toast />
 </div>
 
 <style>

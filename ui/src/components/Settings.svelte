@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { api } from '$lib/api';
+  import { toasts } from '$lib/toast';
   import type { SystemConfig } from '$lib/types';
 
   let config = $state<SystemConfig | null>(null);
@@ -12,6 +13,7 @@
       config = await api.getConfig();
     } catch (err) {
       error = err instanceof Error ? err.message : 'Failed to load settings';
+      toasts.show('Failed to load settings', 'error');
     }
   });
 
@@ -23,9 +25,10 @@
 
     try {
       await api.updateConfig(config);
-      alert('Settings saved successfully');
+      toasts.show('Settings saved successfully', 'success');
     } catch (err) {
       error = err instanceof Error ? err.message : 'Failed to save settings';
+      toasts.show('Failed to save settings', 'error');
     } finally {
       saving = false;
     }

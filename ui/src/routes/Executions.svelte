@@ -2,12 +2,18 @@
   import { onMount } from 'svelte';
   import { executions } from '../lib/stores';
   import { navigate } from '../lib/router';
+  import { toasts } from '../lib/toast';
+
+  let loading = $state(true);
 
   onMount(async () => {
     try {
       await executions.load();
     } catch (error) {
       console.error('Failed to load executions:', error);
+      toasts.show('Failed to load executions', 'error');
+    } finally {
+      loading = false;
     }
   });
 
@@ -35,7 +41,12 @@
     <p>Monitor workflow execution history</p>
   </div>
 
-  {#if $executions.length === 0}
+  {#if loading}
+    <div class="loading-state">
+      <div class="spinner"></div>
+      <p>Loading executions...</p>
+    </div>
+  {:else if $executions.length === 0}
     <div class="empty-state">
       <p>No executions yet</p>
       <button on:click={() => navigate('/workflows')}>
@@ -105,6 +116,35 @@
     color: #999;
   }
 
+  .loading-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 4rem 2rem;
+    gap: 1rem;
+  }
+
+  .loading-state p {
+    color: #999;
+    font-size: 1.125rem;
+  }
+
+  .spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid #333;
+    border-top-color: #00d4ff;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
   .empty-state {
     text-align: center;
     padding: 4rem 2rem;
@@ -127,6 +167,12 @@
     border-radius: 4px;
     font-weight: 600;
     cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .empty-state button:hover {
+    background: #00b8e6;
+    transform: translateY(-1px);
   }
 
   .executions-list {
@@ -147,6 +193,7 @@
   .execution-card:hover {
     border-color: #00d4ff;
     transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 212, 255, 0.1);
   }
 
   .execution-header {

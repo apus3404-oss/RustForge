@@ -6,9 +6,9 @@
 
 RustForge is a high-performance orchestration engine for AI agent workflows. Define multi-agent workflows in YAML, execute them locally with full control over your data, and leverage powerful features like variable interpolation, checkpointing, and real-time event streaming.
 
-**Current Status:** Phase 4 - API & Execution Patterns ✅
+**Current Status:** Phase 5 - UI Layer ✅
 
-Phase 4 adds REST API with WebSocket support, parallel execution, merge strategies, timeout/cancellation, and comprehensive integration tests.
+Phase 5 adds a modern web UI built with Svelte 5, featuring visual workflow builder, real-time execution monitoring, and comprehensive workflow management.
 
 ## Features
 
@@ -37,7 +37,7 @@ Phase 4 adds REST API with WebSocket support, parallel execution, merge strategi
 - **Audit Logging** - Security event tracking for compliance
 - **Path & Command Validation** - Prevent unauthorized access and dangerous operations
 
-### API & Execution Patterns (Phase 4) 🆕
+### API & Execution Patterns (Phase 4)
 - **REST API** - Full HTTP API with Axum for workflow and execution management
 - **WebSocket Support** - Real-time execution event streaming with bidirectional control
 - **Parallel Execution** - Concurrent agent execution with tokio::spawn
@@ -45,6 +45,14 @@ Phase 4 adds REST API with WebSocket support, parallel execution, merge strategi
 - **Timeout & Cancellation** - Graceful shutdown with CancellationToken
 - **Unified Executor** - Single executor supporting sequential, parallel, and DAG modes
 - **Integration Tests** - Comprehensive end-to-end workflow testing
+
+### UI Layer (Phase 5) 🆕
+- **Modern Web UI** - Built with Svelte 5 and Technical Blueprint aesthetic
+- **Visual Workflow Builder** - Drag-and-drop canvas for designing workflows
+- **Real-time Monitoring** - Live execution tracking with WebSocket updates
+- **Execution History** - Browse and review past workflow runs
+- **Settings Management** - Configure API endpoints and preferences
+- **Responsive Design** - Clean, intuitive interface with status indicators
 
 ## Installation
 
@@ -98,7 +106,34 @@ sudo cp target/release/rustforge /usr/local/bin/
 
 ## Quick Start
 
-### 1. Initialize a Project
+### 1. Start the Backend
+
+```bash
+# Build and start the API server
+cargo build --release
+./target/release/rustforge serve --port 3000
+```
+
+The backend will be available at `http://localhost:3000`
+
+### 2. Start the UI (Optional)
+
+```bash
+# Navigate to UI directory
+cd ui
+
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+```
+
+The UI will be available at `http://localhost:5173`
+
+**Note:** The UI is also served by the backend at `http://localhost:3000` when you run `rustforge serve`.
+
+### 3. Initialize a Project
 
 ```bash
 rustforge init
@@ -335,6 +370,65 @@ ws.send(JSON.stringify({ type: 'resume' }));
 ws.send(JSON.stringify({ type: 'cancel' }));
 ```
 
+## Web UI
+
+RustForge includes a modern web interface for visual workflow management and monitoring.
+
+### Accessing the UI
+
+The UI is automatically served by the backend:
+
+```bash
+rustforge serve --port 3000
+```
+
+Then open `http://localhost:3000` in your browser.
+
+### UI Features
+
+**Home Dashboard**
+- Quick access to all major features
+- Action cards for creating workflows, viewing executions, and settings
+
+**Visual Workflow Builder**
+- Drag-and-drop agent nodes on canvas
+- Visual connection editor for dependencies
+- Real-time workflow validation
+- Support for Sequential, Parallel, and DAG modes
+- Export workflows as YAML
+
+**Execution Monitor**
+- Real-time event timeline with WebSocket updates
+- Live status tracking (Running, Completed, Failed, Paused)
+- Execution controls (Pause, Resume, Cancel)
+- Detailed event logs with agent outputs and errors
+- Visual status indicators with color coding
+
+**Execution History**
+- Browse past workflow executions
+- Filter by status and workflow
+- View detailed execution timelines
+- Error messages for failed runs
+
+**Settings**
+- Configure API base URL
+- Set WebSocket endpoint
+- Manage UI preferences
+
+### UI Development
+
+For UI development and customization:
+
+```bash
+cd ui
+npm install
+npm run dev  # Development server at http://localhost:5173
+npm run build  # Production build
+npm run preview  # Preview production build
+```
+
+See `docs/ui-guide.md` for detailed UI documentation, features, and troubleshooting.
+
 Variables are resolved at runtime using the execution context.
 
 ## Architecture
@@ -458,17 +552,24 @@ rustforge/
   - Audit logging for security events
   - Path and command validation
   
-- 🚧 **Phase 4: API & Execution Patterns** (Next)
+- ✅ **Phase 4: API & Execution Patterns** (Completed)
   - REST API for workflow execution
   - Parallel execution mode
-  - Advanced execution patterns
-  - Tool result caching
+  - WebSocket support for real-time events
+  - Merge strategies and timeout/cancellation
   
-- 📋 **Phase 5+: Advanced Features**
-  - Web UI dashboard
-  - Plugin system
-  - Additional LLM providers (Anthropic, etc.)
-  - Distributed execution
+- ✅ **Phase 5: UI Layer** (Completed)
+  - Modern web UI with Svelte 5
+  - Visual workflow builder
+  - Real-time execution monitoring
+  - Execution history and settings management
+  
+- 📋 **Phase 6+: Advanced Features** (Future)
+  - Plugin system for custom tools and agents
+  - Additional LLM providers (Anthropic, Google, etc.)
+  - Distributed execution across multiple nodes
+  - Workflow templates library
+  - Advanced debugging and profiling tools
 
 ## Contributing
 
@@ -482,8 +583,5 @@ MIT License - see LICENSE file for details.
 
 - **Repository:** https://github.com/apus3404-oss/RustForge
 - **Documentation:** `docs/getting-started.md`
+- **UI Guide:** `docs/ui-guide.md`
 - **Design Specs:** `docs/specs/design.md`
-
----
-
-**Note:** Phase 3 is complete with 6 built-in tools, permission system, process isolation, and audit logging. Agents can now execute tools with security controls. Phase 4 will add REST API, parallel execution, and advanced execution patterns.

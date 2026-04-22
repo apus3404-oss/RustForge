@@ -1,16 +1,31 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import WorkflowBuilder from '../components/WorkflowBuilder.svelte';
   import { workflows } from '../lib/stores';
   import { navigate } from '../lib/router';
+  import { toasts } from '../lib/toast';
   import type { WorkflowDefinition } from '../lib/types';
+
+  let loading = $state(true);
+
+  onMount(async () => {
+    try {
+      await workflows.load();
+    } catch (error) {
+      console.error('Failed to load workflows:', error);
+      toasts.show('Failed to load workflows', 'error');
+    } finally {
+      loading = false;
+    }
+  });
 
   async function handleSave(workflow: WorkflowDefinition) {
     try {
       await workflows.create(workflow);
-      alert(`Workflow "${workflow.name}" saved successfully!`);
+      toasts.show(`Workflow "${workflow.name}" saved successfully!`, 'success');
     } catch (error) {
       console.error('Failed to save workflow:', error);
-      alert('Failed to save workflow. Check console for details.');
+      toasts.show('Failed to save workflow. Please try again.', 'error');
     }
   }
 
