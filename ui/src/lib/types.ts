@@ -66,3 +66,18 @@ export interface ApiError {
   error: string;
   details?: string;
 }
+
+// System configuration
+export interface SystemConfig {
+  llm: {
+    default_provider: string;
+    fallback_enabled: boolean;
+  };
+  execution: {
+    max_parallel_agents: number;
+    default_timeout: number;
+  };
+  permissions: {
+    default_policy: 'allow' | 'deny' | 'prompt';
+  };
+}

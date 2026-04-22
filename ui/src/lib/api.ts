@@ -5,6 +5,7 @@ import type {
   ExecutionResponse,
   ExecutionDetails,
   ExecutionSummary,
+  SystemConfig,
 } from './types';
 
 const API_BASE = '/api';
@@ -97,6 +98,34 @@ export class ApiClient {
     await this.fetchJson<void>(`${API_BASE}/executions/${executionId}/cancel`, {
       method: 'POST',
     });
+  }
+
+  // Mock config methods (backend API doesn't have /api/config endpoints yet)
+  async getConfig(): Promise<SystemConfig> {
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 300));
+
+    return {
+      llm: {
+        default_provider: 'anthropic',
+        fallback_enabled: true,
+      },
+      execution: {
+        max_parallel_agents: 4,
+        default_timeout: 300,
+      },
+      permissions: {
+        default_policy: 'prompt',
+      },
+    };
+  }
+
+  async updateConfig(config: SystemConfig): Promise<void> {
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // In a real implementation, this would POST to /api/config
+    console.log('Mock: Config updated', config);
   }
 }
 
