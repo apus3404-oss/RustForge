@@ -4,12 +4,19 @@ use axum::{
     routing::{delete, get, post},
     Router,
 };
-use tower_http::cors::CorsLayer;
+use tower_http::{
+    cors::CorsLayer,
+    services::{ServeDir, ServeFile},
+};
 
 /// Start the API server
 pub async fn start_server(state: AppState, port: u16) -> Result<()> {
+    // Serve static files from dist/ui with SPA fallback
+    let serve_dir = ServeDir::new("dist/ui")
+        .not_found_service(ServeFile::new("dist/ui/index.html"));
+
     let app = Router::new()
-        // Workflow routes
+        // API routes - must come before static file serving
         .route(
             "/api/workflows",
             post(handlers::workflows::create_workflow),
@@ -23,7 +30,6 @@ pub async fn start_server(state: AppState, port: u16) -> Result<()> {
             "/api/workflows/:id",
             delete(handlers::workflows::delete_workflow),
         )
-        // Execution routes
         .route(
             "/api/workflows/:id/execute",
             post(handlers::executions::execute_workflow),
@@ -48,17 +54,18 @@ pub async fn start_server(state: AppState, port: u16) -> Result<()> {
             "/api/executions/:id",
             delete(handlers::executions::cancel_execution),
         )
-        // WebSocket
         .route(
             "/api/ws/executions/:id",
             get(websocket::websocket_handler),
         )
-        // Middleware
-        .layer(CorsLayer::permissive())
-        .with_state(state);
+        .with_state(state)
+        // Static files and SPA fallback - must come after API routes
+        .fallback_service(serve_dir)
+        .layer(CorsLayer::permissive());
 
     let addr = format!("0.0.0.0:{}", port);
     tracing::info!("Starting API server on {}", addr);
+    tracing::info!("Serving UI from dist/ui");
 
     let listener = tokio::net::TcpListener::bind(&addr)
         .await

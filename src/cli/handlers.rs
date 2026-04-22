@@ -1,10 +1,14 @@
 // src/cli/handlers.rs
 use crate::agents::AgentRegistry;
+use crate::api::{AppState, ExecutionRegistry};
 use crate::cli::commands::{Commands, ConfigCommands};
 use crate::config::{ConfigLoader, GlobalConfig};
 use crate::engine::{EventBus, ExecutionContext, SequentialExecutor, WorkflowParser};
 use crate::error::Result;
 use crate::llm::{LLMRegistry, OllamaProvider, OpenAIProvider};
+use crate::security::{AuditLogger, PermissionManager};
+use crate::storage::{StateStore, WorkflowStore};
+use crate::tools::ToolRegistry;
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -20,6 +24,7 @@ pub async fn handle_command(command: Commands) -> Result<()> {
         } => handle_run(workflow, inputs, resume).await,
         Commands::Validate { workflow } => handle_validate(workflow).await,
         Commands::List => handle_list().await,
+        Commands::Server { port } => handle_server(port).await,
         Commands::Config { command } => handle_config(command).await,
     }
 }
@@ -153,6 +158,68 @@ async fn handle_list() -> Result<()> {
             println!("  - {}", path.file_stem().unwrap().to_str().unwrap());
         }
     }
+
+    Ok(())
+}
+
+async fn handle_server(port: u16) -> Result<()> {
+    println!("Starting RustForge API server on port {}...", port);
+
+    // Load configuration
+    let config = Arc::new(ConfigLoader::load()?);
+
+    // Initialize storage
+    let temp_dir = env::temp_dir().join("rustforge");
+    fs::create_dir_all(&temp_dir)?;
+
+    let state_store = Arc::new(StateStore::new(temp_dir.join("state.db"))?);
+    let workflow_store = Arc::new(WorkflowStore::new(&temp_dir)?);
+
+    // Create execution registry
+    let execution_registry = Arc::new(ExecutionRegistry::new());
+
+    // Create event bus
+    let event_bus = Arc::new(EventBus::new());
+
+    // Create LLM registry
+    let ollama = Arc::new(OllamaProvider::new(
+        "http://localhost:11434".to_string(),
+        "llama3".to_string(),
+    ));
+    let openai = Arc::new(OpenAIProvider::new(
+        env::var("OPENAI_API_KEY").unwrap_or_default(),
+        "gpt-4o-mini".to_string(),
+    ));
+    let llm_registry = Arc::new(LLMRegistry::with_fallback(ollama, openai));
+
+    // Create agent registry
+    let agent_registry = Arc::new(AgentRegistry::new());
+
+    // Create tool registry
+    let tool_registry = Arc::new(ToolRegistry::new());
+
+    // Create permission manager (allow all for now)
+    let permission_manager = Arc::new(PermissionManager::allow_all());
+
+    // Create audit logger
+    let audit_logger = Arc::new(AuditLogger::new());
+
+    // Create app state
+    let state = AppState::new(
+        config,
+        llm_registry,
+        agent_registry,
+        tool_registry,
+        permission_manager,
+        state_store,
+        workflow_store,
+        execution_registry,
+        event_bus,
+        audit_logger,
+    );
+
+    // Start server
+    crate::api::server::start_server(state, port).await?;
 
     Ok(())
 }

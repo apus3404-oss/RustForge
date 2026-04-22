@@ -41,6 +41,13 @@ pub enum Commands {
     /// List available workflows
     List,
 
+    /// Start the API server
+    Server {
+        /// Port to bind to
+        #[arg(short, long, default_value = "3000")]
+        port: u16,
+    },
+
     /// Configuration management
     Config {
         #[command(subcommand)]
