@@ -1,6 +1,6 @@
 use crate::api::{ApiError, AppState};
 use crate::engine::types::ExecutionContext;
-use crate::engine::WorkflowExecutor;
+use crate::engine::{CancellationToken, WorkflowExecutor};
 use crate::storage::StoredExecutionStatus;
 use axum::{
     extract::{Path, State},
@@ -197,6 +197,7 @@ mod tests {
             permission_manager,
             state_store,
             workflow_store,
+            Arc::new(crate::api::ExecutionRegistry::new()),
             event_bus,
             audit_logger,
         )

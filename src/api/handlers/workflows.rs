@@ -194,6 +194,7 @@ mod tests {
             permission_manager,
             state_store,
             workflow_store,
+            Arc::new(crate::api::ExecutionRegistry::new()),
             event_bus,
             audit_logger,
         )

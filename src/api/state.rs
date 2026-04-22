@@ -1,4 +1,5 @@
 use crate::agents::AgentRegistry;
+use crate::api::ExecutionRegistry;
 use crate::config::GlobalConfig;
 use crate::engine::EventBus;
 use crate::llm::LLMRegistry;
@@ -24,6 +25,8 @@ pub struct AppState {
     pub state_store: Arc<StateStore>,
     /// Workflow store for workflow definitions
     pub workflow_store: Arc<WorkflowStore>,
+    /// Execution registry for tracking active executions
+    pub execution_registry: Arc<ExecutionRegistry>,
     /// Event bus for real-time updates
     pub event_bus: Arc<EventBus>,
     /// Audit logger
@@ -40,6 +43,7 @@ impl AppState {
         permission_manager: Arc<PermissionManager>,
         state_store: Arc<StateStore>,
         workflow_store: Arc<WorkflowStore>,
+        execution_registry: Arc<ExecutionRegistry>,
         event_bus: Arc<EventBus>,
         audit_logger: Arc<AuditLogger>,
     ) -> Self {
@@ -51,6 +55,7 @@ impl AppState {
             permission_manager,
             state_store,
             workflow_store,
+            execution_registry,
             event_bus,
             audit_logger,
         }
@@ -121,6 +126,7 @@ mod tests {
             permission_manager,
             state_store,
             workflow_store,
+            Arc::new(ExecutionRegistry::new()),
             event_bus,
             audit_logger,
         );
@@ -161,6 +167,7 @@ mod tests {
             permission_manager,
             state_store,
             workflow_store,
+            Arc::new(ExecutionRegistry::new()),
             event_bus,
             audit_logger,
         );
