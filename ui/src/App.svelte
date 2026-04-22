@@ -1,11 +1,23 @@
 <script lang="ts">
-  import WorkflowBuilder from './components/WorkflowBuilder.svelte';
-  import type { WorkflowDefinition } from './lib/types';
-
-  function handleSave(workflow: WorkflowDefinition) {
-    console.log('Workflow saved:', workflow);
-    alert(`Workflow "${workflow.name}" saved with ${workflow.agents.length} agents!`);
-  }
+  import Navigation from './components/Navigation.svelte';
+  import Router from './components/Router.svelte';
 </script>
 
-<WorkflowBuilder onSave={handleSave} />
+<div class="app">
+  <Navigation />
+  <main>
+    <Router />
+  </main>
+</div>
+
+<style>
+  .app {
+    min-height: 100vh;
+    background: #0d0d0d;
+    color: #fff;
+  }
+
+  main {
+    min-height: calc(100vh - 60px);
+  }
+</style>

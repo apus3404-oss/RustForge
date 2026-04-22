@@ -4,7 +4,7 @@
   import { events, addEvent, clearEvents } from '$lib/stores';
   import { api } from '$lib/api';
 
-  export let executionId: string;
+  let { executionId }: { executionId: string } = $props();
 
   let status = $state<'running' | 'completed' | 'failed' | 'paused'>('running');
   let ws: ExecutionWebSocket | null = null;
