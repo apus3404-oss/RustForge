@@ -351,8 +351,8 @@ RustForge uses a layered architecture:
 ├─────────────────────────────────────┤
 │   Orchestration Engine (tokio)      │  Workflow execution
 │  • Parser  • Validator              │
-│  • Executor  • Interpolator          │
-│  • Event Bus  • Checkpoints          │
+│  • Executor  • Interpolator         │
+│  • Event Bus  • Checkpoints         │
 └─────────────────────────────────────┘
 ```
 
