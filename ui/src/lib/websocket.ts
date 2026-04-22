@@ -8,6 +8,8 @@ export class ExecutionWebSocket {
   private ws: WebSocket | null = null;
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;
+  private reconnectTimeout: number | null = null;
+  private intentionalClose = false;
 
   constructor(
     private executionId: string,
@@ -38,7 +40,9 @@ export class ExecutionWebSocket {
 
     this.ws.onclose = () => {
       console.log('WebSocket closed');
-      this.attemptReconnect();
+      if (!this.intentionalClose) {
+        this.attemptReconnect();
+      }
     };
   }
 
@@ -47,7 +51,7 @@ export class ExecutionWebSocket {
       this.reconnectAttempts++;
       const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 10000);
       console.log(`Reconnecting in ${delay}ms...`);
-      setTimeout(() => this.connect(), delay);
+      this.reconnectTimeout = setTimeout(() => this.connect(), delay) as unknown as number;
     }
   }
 
@@ -58,6 +62,11 @@ export class ExecutionWebSocket {
   }
 
   disconnect() {
+    this.intentionalClose = true;
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
+      this.reconnectTimeout = null;
+    }
     if (this.ws) {
       this.ws.close();
       this.ws = null;
