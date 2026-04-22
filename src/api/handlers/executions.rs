@@ -89,49 +89,229 @@ pub async fn execute_workflow(
 
 /// Get execution details
 pub async fn get_execution(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
     Path(execution_id): Path<Uuid>,
 ) -> Result<Json<ExecutionDetails>, ApiError> {
-    // TODO: Implement execution retrieval from state store
-    // For now, return not found
-    Err(ApiError::not_found("Execution", &execution_id.to_string()))
+    // Load execution from state store
+    let stored = state
+        .state_store
+        .get_execution(&execution_id.to_string())
+        .map_err(|_| ApiError::not_found("Execution", &execution_id.to_string()))?
+        .ok_or_else(|| ApiError::not_found("Execution", &execution_id.to_string()))?;
+
+    // Deserialize data field from Vec<u8> to JSON
+    let data: serde_json::Value = serde_json::from_slice(&stored.data)
+        .unwrap_or(serde_json::json!({}));
+
+    // Parse data field to extract execution details
+    let workflow_id = data
+        .get("workflow_id")
+        .and_then(|v| v.as_str())
+        .unwrap_or("unknown")
+        .to_string();
+
+    let started_at = data
+        .get("started_at")
+        .and_then(|v| v.as_str())
+        .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
+        .map(|dt| dt.with_timezone(&Utc))
+        .unwrap_or_else(|| {
+            chrono::DateTime::from_timestamp(stored.created_at as i64, 0)
+                .unwrap_or_else(|| Utc::now())
+        });
+
+    let completed_at = data
+        .get("completed_at")
+        .and_then(|v| v.as_str())
+        .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
+        .map(|dt| dt.with_timezone(&Utc));
+
+    let outputs = data
+        .get("result")
+        .and_then(|v| v.as_object())
+        .map(|obj| obj.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
+        .unwrap_or_default();
+
+    let error = data
+        .get("error")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
+
+    let status = match stored.status {
+        StoredExecutionStatus::Running => ExecutionStatus::Running,
+        StoredExecutionStatus::Completed => ExecutionStatus::Completed,
+        StoredExecutionStatus::Failed => ExecutionStatus::Failed,
+        StoredExecutionStatus::Paused => ExecutionStatus::Paused,
+        StoredExecutionStatus::Cancelled => ExecutionStatus::Cancelled,
+    };
+
+    Ok(Json(ExecutionDetails {
+        id: execution_id,
+        workflow_id,
+        status,
+        started_at,
+        completed_at,
+        outputs,
+        error,
+    }))
 }
 
 /// List all executions
 pub async fn list_executions(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
 ) -> Result<Json<Vec<ExecutionDetails>>, ApiError> {
-    // TODO: List executions from state store
-    Ok(Json(vec![]))
+    // List all executions from state store
+    let stored_executions = state
+        .state_store
+        .list_executions()
+        .map_err(|e| ApiError::internal_error(format!("Failed to list executions: {}", e)))?;
+
+    let mut executions = Vec::new();
+
+    for stored in stored_executions {
+        // Parse execution ID
+        let execution_id = Uuid::parse_str(&stored.id)
+            .unwrap_or_else(|_| Uuid::nil());
+
+        // Deserialize data field from Vec<u8> to JSON
+        let data: serde_json::Value = serde_json::from_slice(&stored.data)
+            .unwrap_or(serde_json::json!({}));
+
+        // Parse data field
+        let workflow_id = data
+            .get("workflow_id")
+            .and_then(|v| v.as_str())
+            .unwrap_or("unknown")
+            .to_string();
+
+        let started_at = data
+            .get("started_at")
+            .and_then(|v| v.as_str())
+            .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
+            .map(|dt| dt.with_timezone(&Utc))
+            .unwrap_or_else(|| {
+                chrono::DateTime::from_timestamp(stored.created_at as i64, 0)
+                    .unwrap_or_else(|| Utc::now())
+            });
+
+        let completed_at = data
+            .get("completed_at")
+            .and_then(|v| v.as_str())
+            .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
+            .map(|dt| dt.with_timezone(&Utc));
+
+        let outputs = data
+            .get("result")
+            .and_then(|v| v.as_object())
+            .map(|obj| obj.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
+            .unwrap_or_default();
+
+        let error = data
+            .get("error")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+
+        let status = match stored.status {
+            StoredExecutionStatus::Running => ExecutionStatus::Running,
+            StoredExecutionStatus::Completed => ExecutionStatus::Completed,
+            StoredExecutionStatus::Failed => ExecutionStatus::Failed,
+            StoredExecutionStatus::Paused => ExecutionStatus::Paused,
+            StoredExecutionStatus::Cancelled => ExecutionStatus::Cancelled,
+        };
+
+        executions.push(ExecutionDetails {
+            id: execution_id,
+            workflow_id,
+            status,
+            started_at,
+            completed_at,
+            outputs,
+            error,
+        });
+    }
+
+    Ok(Json(executions))
 }
 
 /// Pause an execution
 pub async fn pause_execution(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
     Path(execution_id): Path<Uuid>,
 ) -> Result<StatusCode, ApiError> {
-    // TODO: Implement pause logic
-    let _ = execution_id;
+    // Check if execution exists
+    let mut stored = state
+        .state_store
+        .get_execution(&execution_id.to_string())
+        .map_err(|_| ApiError::not_found("Execution", &execution_id.to_string()))?
+        .ok_or_else(|| ApiError::not_found("Execution", &execution_id.to_string()))?;
+
+    // Check if execution is running
+    if stored.status != StoredExecutionStatus::Running {
+        return Err(ApiError::bad_request("Execution is not running"));
+    }
+
+    // Update status to Paused
+    stored.status = StoredExecutionStatus::Paused;
+    stored.updated_at = chrono::Utc::now().timestamp() as u64;
+
+    state
+        .state_store
+        .save_execution(&stored)
+        .map_err(|e| ApiError::internal_error(format!("Failed to update execution: {}", e)))?;
+
     Ok(StatusCode::OK)
 }
 
 /// Resume an execution
 pub async fn resume_execution(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
     Path(execution_id): Path<Uuid>,
 ) -> Result<StatusCode, ApiError> {
-    // TODO: Implement resume logic
-    let _ = execution_id;
+    // Check if execution exists
+    let mut stored = state
+        .state_store
+        .get_execution(&execution_id.to_string())
+        .map_err(|_| ApiError::not_found("Execution", &execution_id.to_string()))?
+        .ok_or_else(|| ApiError::not_found("Execution", &execution_id.to_string()))?;
+
+    // Check if execution is paused
+    if stored.status != StoredExecutionStatus::Paused {
+        return Err(ApiError::bad_request("Execution is not paused"));
+    }
+
+    // Update status to Running
+    stored.status = StoredExecutionStatus::Running;
+    stored.updated_at = chrono::Utc::now().timestamp() as u64;
+
+    state
+        .state_store
+        .save_execution(&stored)
+        .map_err(|e| ApiError::internal_error(format!("Failed to update execution: {}", e)))?;
+
     Ok(StatusCode::OK)
 }
 
 /// Cancel an execution
 pub async fn cancel_execution(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
     Path(execution_id): Path<Uuid>,
 ) -> Result<StatusCode, ApiError> {
-    // TODO: Implement cancel logic
-    let _ = execution_id;
+    // Check if execution exists in registry and cancel it
+    if state.execution_registry.exists(&execution_id).await {
+        state.execution_registry.cancel(&execution_id).await;
+    }
+
+    // Update status in state store if execution exists
+    if let Ok(Some(mut stored)) = state.state_store.get_execution(&execution_id.to_string()) {
+        stored.status = StoredExecutionStatus::Cancelled;
+        stored.updated_at = chrono::Utc::now().timestamp() as u64;
+
+        state
+            .state_store
+            .save_execution(&stored)
+            .map_err(|e| ApiError::internal_error(format!("Failed to update execution: {}", e)))?;
+    }
+
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -260,9 +440,25 @@ mod tests {
         let state = create_test_state();
         let execution_id = Uuid::new_v4();
 
-        let result = pause_execution(State(state), Path(execution_id)).await;
+        // Create a running execution first
+        let execution = crate::storage::StoredExecution {
+            id: execution_id.to_string(),
+            status: crate::storage::StoredExecutionStatus::Running,
+            created_at: chrono::Utc::now().timestamp() as u64,
+            updated_at: chrono::Utc::now().timestamp() as u64,
+            data: serde_json::to_vec(&serde_json::json!({
+                "workflow_id": "test-workflow"
+            })).unwrap(),
+        };
+        state.state_store.save_execution(&execution).unwrap();
+
+        let result = pause_execution(State(state.clone()), Path(execution_id)).await;
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), StatusCode::OK);
+
+        // Verify status changed to Paused
+        let stored = state.state_store.get_execution(&execution_id.to_string()).unwrap().unwrap();
+        assert_eq!(stored.status, crate::storage::StoredExecutionStatus::Paused);
     }
 
     #[tokio::test]
@@ -270,9 +466,25 @@ mod tests {
         let state = create_test_state();
         let execution_id = Uuid::new_v4();
 
-        let result = resume_execution(State(state), Path(execution_id)).await;
+        // Create a paused execution first
+        let execution = crate::storage::StoredExecution {
+            id: execution_id.to_string(),
+            status: crate::storage::StoredExecutionStatus::Paused,
+            created_at: chrono::Utc::now().timestamp() as u64,
+            updated_at: chrono::Utc::now().timestamp() as u64,
+            data: serde_json::to_vec(&serde_json::json!({
+                "workflow_id": "test-workflow"
+            })).unwrap(),
+        };
+        state.state_store.save_execution(&execution).unwrap();
+
+        let result = resume_execution(State(state.clone()), Path(execution_id)).await;
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), StatusCode::OK);
+
+        // Verify status changed to Running
+        let stored = state.state_store.get_execution(&execution_id.to_string()).unwrap().unwrap();
+        assert_eq!(stored.status, crate::storage::StoredExecutionStatus::Running);
     }
 
     #[tokio::test]

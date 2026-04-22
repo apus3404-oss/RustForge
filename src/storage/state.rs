@@ -27,6 +27,8 @@ pub enum StoredExecutionStatus {
     Running,
     Completed,
     Failed,
+    Paused,
+    Cancelled,
 }
 
 // Define redb table schemas
@@ -77,6 +79,21 @@ impl StateStore {
             }
             None => Ok(None),
         }
+    }
+
+    pub fn list_executions(&self) -> Result<Vec<StoredExecution>> {
+        let read_txn = self.db.begin_read()?;
+        let table = read_txn.open_table(EXECUTIONS_TABLE)?;
+
+        let mut executions = Vec::new();
+        for result in table.iter()? {
+            let (_key, value) = result?;
+            let bytes = value.value();
+            let execution: StoredExecution = bincode::deserialize(bytes)?;
+            executions.push(execution);
+        }
+
+        Ok(executions)
     }
 
     pub fn save_checkpoint(&self, checkpoint: &Checkpoint) -> Result<()> {
