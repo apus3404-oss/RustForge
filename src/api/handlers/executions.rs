@@ -64,6 +64,35 @@ pub async fn execute_workflow(
         context.set_value(format!("input.{}", key), value);
     }
 
+    // Create initial execution record
+    let started_at = Utc::now();
+    let execution_data = serde_json::json!({
+        "workflow_id": workflow_id,
+        "started_at": started_at.to_rfc3339(),
+    });
+
+    let stored_execution = crate::storage::StoredExecution {
+        id: execution_id.to_string(),
+        status: crate::storage::StoredExecutionStatus::Running,
+        created_at: started_at.timestamp() as u64,
+        updated_at: started_at.timestamp() as u64,
+        data: serde_json::to_vec(&execution_data)
+            .map_err(|e| ApiError::internal_error(format!("Failed to serialize execution data: {}", e)))?,
+    };
+
+    // Save initial execution state
+    state
+        .state_store
+        .save_execution(&stored_execution)
+        .map_err(|e| ApiError::internal_error(format!("Failed to save execution: {}", e)))?;
+
+    // Register execution with cancellation token
+    let cancellation_token = CancellationToken::new();
+    state
+        .execution_registry
+        .register(execution_id, workflow_id.clone(), cancellation_token.clone())
+        .await;
+
     // Create executor
     let executor = WorkflowExecutor::new(
         state.event_bus.clone(),
@@ -73,17 +102,61 @@ pub async fn execute_workflow(
 
     // Spawn execution in background
     let state_clone = state.clone();
-    let workflow_id_clone = workflow_id.clone();
     tokio::spawn(async move {
         let mut exec_context = context;
-        let _result = executor.execute(&workflow, &mut exec_context).await;
-        // TODO: Store execution result in state store
+        let result = executor.execute(&workflow, &mut exec_context).await;
+
+        // Prepare final execution data
+        let completed_at = Utc::now();
+        let (final_status, final_data) = match result {
+            Ok(_) => {
+                // Get all outputs from context store
+                let outputs: HashMap<String, serde_json::Value> = exec_context
+                    .context_store
+                    .iter()
+                    .map(|(k, v)| (k.clone(), v.clone()))
+                    .collect();
+
+                let data = serde_json::json!({
+                    "workflow_id": workflow_id,
+                    "started_at": started_at.to_rfc3339(),
+                    "completed_at": completed_at.to_rfc3339(),
+                    "result": outputs,
+                });
+
+                (crate::storage::StoredExecutionStatus::Completed, data)
+            }
+            Err(e) => {
+                let data = serde_json::json!({
+                    "workflow_id": workflow_id,
+                    "started_at": started_at.to_rfc3339(),
+                    "completed_at": completed_at.to_rfc3339(),
+                    "error": e.to_string(),
+                });
+
+                (crate::storage::StoredExecutionStatus::Failed, data)
+            }
+        };
+
+        // Update execution in state store
+        let final_execution = crate::storage::StoredExecution {
+            id: execution_id.to_string(),
+            status: final_status,
+            created_at: started_at.timestamp() as u64,
+            updated_at: completed_at.timestamp() as u64,
+            data: serde_json::to_vec(&final_data).unwrap_or_default(),
+        };
+
+        let _ = state_clone.state_store.save_execution(&final_execution);
+
+        // Unregister from execution registry
+        state_clone.execution_registry.unregister(&execution_id).await;
     });
 
     Ok(Json(ExecutionResponse {
         execution_id,
         status: ExecutionStatus::Running,
-        started_at: Utc::now(),
+        started_at,
     }))
 }
 

@@ -49,6 +49,9 @@ async fn handle_socket(socket: WebSocket, execution_id: Uuid, state: AppState) {
         }
     });
 
+    // Clone state for recv_task
+    let state_clone = state.clone();
+
     // Handle incoming messages
     let recv_task = tokio::spawn(async move {
         while let Some(Ok(msg)) = receiver.next().await {
@@ -57,16 +60,51 @@ async fn handle_socket(socket: WebSocket, execution_id: Uuid, state: AppState) {
                 if let Ok(cmd) = serde_json::from_str::<ClientCommand>(&text) {
                     match cmd {
                         ClientCommand::Pause => {
-                            // TODO: Pause execution
                             tracing::info!("Pause command received for execution {}", execution_id);
+
+                            // Load and update execution status
+                            if let Ok(Some(mut stored)) = state_clone.state_store.get_execution(&execution_id.to_string()) {
+                                if stored.status == crate::storage::StoredExecutionStatus::Running {
+                                    stored.status = crate::storage::StoredExecutionStatus::Paused;
+                                    stored.updated_at = chrono::Utc::now().timestamp() as u64;
+                                    let _ = state_clone.state_store.save_execution(&stored);
+                                    tracing::info!("Execution {} paused", execution_id);
+                                } else {
+                                    tracing::warn!("Cannot pause execution {} - not running", execution_id);
+                                }
+                            }
                         }
                         ClientCommand::Resume => {
-                            // TODO: Resume execution
                             tracing::info!("Resume command received for execution {}", execution_id);
+
+                            // Load and update execution status
+                            if let Ok(Some(mut stored)) = state_clone.state_store.get_execution(&execution_id.to_string()) {
+                                if stored.status == crate::storage::StoredExecutionStatus::Paused {
+                                    stored.status = crate::storage::StoredExecutionStatus::Running;
+                                    stored.updated_at = chrono::Utc::now().timestamp() as u64;
+                                    let _ = state_clone.state_store.save_execution(&stored);
+                                    tracing::info!("Execution {} resumed", execution_id);
+                                } else {
+                                    tracing::warn!("Cannot resume execution {} - not paused", execution_id);
+                                }
+                            }
                         }
                         ClientCommand::Cancel => {
-                            // TODO: Cancel execution
                             tracing::info!("Cancel command received for execution {}", execution_id);
+
+                            // Cancel via execution registry
+                            if state_clone.execution_registry.exists(&execution_id).await {
+                                state_clone.execution_registry.cancel(&execution_id).await;
+                                tracing::info!("Execution {} cancelled via registry", execution_id);
+                            }
+
+                            // Update status in state store
+                            if let Ok(Some(mut stored)) = state_clone.state_store.get_execution(&execution_id.to_string()) {
+                                stored.status = crate::storage::StoredExecutionStatus::Cancelled;
+                                stored.updated_at = chrono::Utc::now().timestamp() as u64;
+                                let _ = state_clone.state_store.save_execution(&stored);
+                                tracing::info!("Execution {} status updated to cancelled", execution_id);
+                            }
                         }
                     }
                 }

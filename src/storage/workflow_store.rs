@@ -99,6 +99,25 @@ impl WorkflowStore {
         self.workflow_path(id).exists()
     }
 
+    /// Get the creation time of a workflow file
+    pub fn get_created_at(&self, id: &str) -> Result<chrono::DateTime<chrono::Utc>> {
+        let file_path = self.workflow_path(id);
+
+        if !file_path.exists() {
+            return Err(Error::WorkflowNotFound {
+                workflow_id: id.to_string(),
+            });
+        }
+
+        let metadata = fs::metadata(&file_path)
+            .map_err(|e| Error::Internal(format!("Failed to read file metadata: {}", e)))?;
+
+        let created = metadata.created()
+            .map_err(|e| Error::Internal(format!("Failed to get creation time: {}", e)))?;
+
+        Ok(chrono::DateTime::from(created))
+    }
+
     /// Get the file path for a workflow
     fn workflow_path(&self, id: &str) -> PathBuf {
         self.workflows_dir.join(format!("{}.yaml", id))

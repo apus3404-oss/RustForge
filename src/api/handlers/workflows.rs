@@ -86,12 +86,18 @@ pub async fn list_workflows(
     // Load each workflow to create summary
     for id in workflow_ids {
         if let Ok(definition) = state.workflow_store.load(&id) {
+            // Get actual creation time from filesystem
+            let created_at = state
+                .workflow_store
+                .get_created_at(&id)
+                .unwrap_or_else(|_| Utc::now());
+
             summaries.push(WorkflowSummary {
                 id: id.clone(),
                 name: definition.name,
                 mode: format!("{:?}", definition.mode).to_lowercase(),
                 agent_count: definition.agents.len(),
-                created_at: Utc::now(), // TODO: Store actual creation time
+                created_at,
             });
         }
     }
