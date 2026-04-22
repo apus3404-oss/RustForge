@@ -17,13 +17,29 @@ export const activeExecutions = derived(
 
 // Store actions for loading data from API
 export async function loadWorkflows() {
-  const data = await api.listWorkflows();
-  workflows.set(data);
+  try {
+    const data = await api.listWorkflows();
+    workflows.set(data);
+  } catch (error) {
+    console.error('Failed to load workflows:', error);
+    throw error; // Re-throw for component handling
+  }
 }
 
 export async function loadExecutions() {
-  const data = await api.listExecutions();
-  executions.set(data);
+  try {
+    const data = await api.listExecutions();
+    executions.set(data);
+  } catch (error) {
+    console.error('Failed to load executions:', error);
+    throw error; // Re-throw for component handling
+  }
+}
+
+export async function startExecution(workflowId: string, inputs: Record<string, any>) {
+  const result = await api.executeWorkflow(workflowId, inputs);
+  await loadExecutions(); // Refresh executions list
+  return result;
 }
 
 // Store actions for managing events

@@ -9,6 +9,7 @@ import {
   activeExecutions,
   loadWorkflows,
   loadExecutions,
+  startExecution,
   addEvent,
   clearEvents,
 } from './stores';
